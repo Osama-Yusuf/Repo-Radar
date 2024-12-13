@@ -642,6 +642,87 @@ app.delete('/api/projects/:id', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /projects/{id}:
+ *   put:
+ *     summary: Update a project
+ *     description: Update an existing project and its branches
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - repoUrl
+ *               - branches
+ *               - checkInterval
+ *             properties:
+ *               name:
+ *                 type: string
+ *               repoUrl:
+ *                 type: string
+ *               branches:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               checkInterval:
+ *                 type: integer
+ */
+app.put('/api/projects/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, repoUrl, branches, checkInterval } = req.body;
+
+    if (checkInterval && checkInterval < 1) {
+        return res.status(400).json({ error: 'Check interval must be at least 1 minute' });
+    }
+
+    try {
+        await runAsync(db, 'BEGIN TRANSACTION');
+
+        await runAsync(db, 'UPDATE projects SET name = ?, repo_url = ?, check_interval = ? WHERE id = ?',
+            [name, repoUrl, checkInterval, id]);
+
+        // Delete existing branches
+        await runAsync(db, 'DELETE FROM branches WHERE project_id = ?', [id]);
+
+        // Add new branches
+        const branchPromises = branches.map(branch => {
+            return runAsync(db, 'INSERT INTO branches (project_id, branch_name) VALUES (?, ?)',
+                [id, branch.trim()]);
+        });
+
+        await Promise.all(branchPromises);
+        await runAsync(db, 'COMMIT');
+
+        const project = {
+            id: parseInt(id),
+            name,
+            repo_url: repoUrl,
+            check_interval: checkInterval,
+            branches
+        };
+
+        // Update project timer
+        setupProjectTimer(project);
+
+        res.json(project);
+    } catch (err) {
+        await runAsync(db, 'ROLLBACK');
+        console.error('Error updating project:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Actions endpoints
 app.put('/api/projects/:projectId/actions/:actionId', async (req, res) => {
     const { projectId, actionId } = req.params;

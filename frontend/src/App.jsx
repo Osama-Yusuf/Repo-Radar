@@ -190,8 +190,8 @@ function App() {
     if (action) {
       setEditingAction(action)
       setActionFormData({
-        name: action.name,
-        action_type: action.webhook_url ? 'webhook' : 'script',
+        name: action.name || '',
+        action_type: action.action_type,
         webhook_url: action.webhook_url || '',
         script_content: action.script_content || ''
       })
@@ -238,10 +238,11 @@ function App() {
         await axios.post(`${API_BASE_URL}/projects/${selectedProject.id}/actions`, actionData)
       }
 
-      handleCloseActionDialog()
       await fetchProjects()
+      handleCloseActionDialog()
     } catch (err) {
-      setError(err.message)
+      console.error('Error saving action:', err)
+      setError(err.response?.data?.error || err.message)
     }
   }
 
@@ -619,7 +620,7 @@ function App() {
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              Manage Actions
+              {editingAction ? 'Edit Action' : 'Manage Actions'}
             </Typography>
             <IconButton onClick={handleCloseActionDialog}>
               <CloseIcon />
@@ -711,7 +712,7 @@ function App() {
             {/* Add New Action */}
             <Grid item xs={12} md={6}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Add New Action
+                {editingAction ? 'Edit Action' : 'Add New Action'}
               </Typography>
               <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1 }}>
                 <TextField
@@ -803,16 +804,20 @@ function App() {
                   </Box>
                 )}
 
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button
-                    onClick={handleSaveAction}
+                <DialogActions>
+                  <Button onClick={handleCloseActionDialog}>Cancel</Button>
+                  <Button 
+                    onClick={handleSaveAction} 
                     variant="contained"
-                    disableElevation
-                    disabled={!actionFormData.name || (actionFormData.action_type === 'webhook' ? !actionFormData.webhook_url : !actionFormData.script_content)}
+                    disabled={
+                      !actionFormData.name ||
+                      (actionFormData.action_type === 'webhook' && !actionFormData.webhook_url) ||
+                      (actionFormData.action_type === 'script' && !actionFormData.script_content)
+                    }
                   >
-                    Add Action
+                    {editingAction ? 'Save Changes' : 'Add Action'}
                   </Button>
-                </Box>
+                </DialogActions>
               </Box>
             </Grid>
           </Grid>
