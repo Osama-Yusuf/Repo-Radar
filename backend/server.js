@@ -723,6 +723,53 @@ app.put('/api/projects/:id', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /projects/{id}:
+ *   get:
+ *     summary: Get a single project
+ *     description: Retrieve a project by its ID
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Project found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Project'
+ *       404:
+ *         description: Project not found
+ */
+app.get('/api/projects/:id', async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        // Get project
+        const project = await getAsync(db, 'SELECT * FROM projects WHERE id = ?', [id]);
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Get branches
+        const branches = await allAsync(db, 'SELECT branch_name FROM branches WHERE project_id = ?', [id]);
+        project.branches = branches.map(b => b.branch_name);
+
+        // Get actions
+        const actions = await allAsync(db, 'SELECT * FROM actions WHERE project_id = ?', [id]);
+        project.actions = actions;
+
+        res.json(project);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Actions endpoints
 app.put('/api/projects/:projectId/actions/:actionId', async (req, res) => {
     const { projectId, actionId } = req.params;
@@ -759,13 +806,15 @@ app.delete('/api/projects/:projectId/actions/:actionId', async (req, res) => {
     const { projectId, actionId } = req.params;
 
     try {
-        await runAsync(db, 'DELETE FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
-
-        if (await getAsync(db, 'SELECT id FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId])) {
-            res.status(404).json({ error: 'Action not found' });
-        } else {
-            res.json({ message: 'Action deleted successfully' });
+        // First check if the action exists
+        const action = await getAsync(db, 'SELECT id FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
+        if (!action) {
+            return res.status(404).json({ error: 'Action not found' });
         }
+
+        // Delete the action if it exists
+        await runAsync(db, 'DELETE FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
+        res.json({ message: 'Action deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

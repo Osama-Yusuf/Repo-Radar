@@ -246,11 +246,17 @@ function App() {
     }
   }
 
-  const handleDeleteAction = async (actionId, e) => {
+  const handleDeleteAction = async (actionId, projectId, e) => {
     e.stopPropagation()
     try {
-      await axios.delete(`${API_BASE_URL}/actions/${actionId}`)
-      fetchProjects()
+      await axios.delete(`${API_BASE_URL}/projects/${projectId}/actions/${actionId}`)
+      await fetchProjects() // Fetch all projects
+      
+      // Update the selected project in the dialog
+      if (selectedProject) {
+        const updatedProject = await axios.get(`${API_BASE_URL}/projects/${projectId}`)
+        setSelectedProject(updatedProject.data)
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -386,7 +392,10 @@ function App() {
                                   label={action.name || 'Unnamed Action'}
                                   size="small"
                                   icon={action.action_type === 'webhook' ? <WebhookIcon /> : <TerminalIcon />}
-                                  onDelete={(e) => handleDeleteAction(action.id, e)}
+                                  onDelete={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteAction(action.id, project.id, e);
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     handleOpenActionDialog(project, action)
@@ -646,7 +655,10 @@ function App() {
                         secondaryAction={
                           <IconButton
                             edge="end"
-                            onClick={() => handleDeleteAction(action.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAction(action.id, selectedProject.id, e);
+                            }}
                             size="small"
                           >
                             <DeleteIcon />
