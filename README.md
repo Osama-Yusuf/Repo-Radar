@@ -48,7 +48,7 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
    cd backend
    npm install
    cp .env.example .env    # Configure your GitHub token
-   npm start
+   npm run dev
    ```
 
 3. **Frontend Setup**
