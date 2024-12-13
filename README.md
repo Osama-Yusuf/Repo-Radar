@@ -39,7 +39,7 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/repo-radar.git
+   git clone https://github.com/Osama-Yusuf/repo-radar.git
    cd repo-radar
    ```
 
