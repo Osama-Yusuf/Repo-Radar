@@ -12,6 +12,8 @@ dist
 .env.local
 .env.production
 .env.development
+.env.example
+.env
 
 # Dependency directories
 bower_components

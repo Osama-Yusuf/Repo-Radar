@@ -57,7 +57,17 @@ import axios from 'axios'
 import './App.css'
 
 const PORT = process.env.PORT || '3001';
-const API_BASE_URL = process.env.BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:3001/api`;
+const API_BASE_URL0 = import.meta.env.BACKEND_BASE_URL || `http://localhost:3001/api`;
+const API_BASE_URL1 = process.env.BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+const API_BASE_URL2 = (window.env && window.env.BACKEND_BASE_URL) || `http://localhost:3001/api`;
+
+
+console.log(`API_BASE_URL: ${API_BASE_URL}`);
+console.log(`API_BASE_URL0: ${API_BASE_URL0}`);
+console.log(`API_BASE_URL1: ${API_BASE_URL1}`);
+console.log(`API_BASE_URL2: ${API_BASE_URL2}`);
 
 function App() {
   const [projects, setProjects] = useState([])
