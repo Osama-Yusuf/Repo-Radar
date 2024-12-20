@@ -56,7 +56,8 @@ import {
 import axios from 'axios'
 import './App.css'
 
-const API_BASE_URL = 'http://localhost:3001/api'
+const PORT = process.env.PORT || '3001';
+const API_BASE_URL = process.env.BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 function App() {
   const [projects, setProjects] = useState([])
@@ -251,7 +252,6 @@ function App() {
     try {
       await axios.delete(`${API_BASE_URL}/projects/${projectId}/actions/${actionId}`)
       await fetchProjects() // Fetch all projects
-      
       // Update the selected project in the dialog
       if (selectedProject) {
         const updatedProject = await axios.get(`${API_BASE_URL}/projects/${projectId}`)
@@ -818,8 +818,8 @@ function App() {
 
                 <DialogActions>
                   <Button onClick={handleCloseActionDialog}>Cancel</Button>
-                  <Button 
-                    onClick={handleSaveAction} 
+                  <Button
+                    onClick={handleSaveAction}
                     variant="contained"
                     disabled={
                       !actionFormData.name ||

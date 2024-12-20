@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - PORT=${PORT:-3001}
+      - BACKEND_BASE_URL=http://backend:${PORT:-3001}/api
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3001}:${PORT:-3001}"
+    environment:
+      - PORT=${PORT:-3001}
+      # - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./backend/database.sqlite:/app/database.sqlite
