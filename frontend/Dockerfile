@@ -44,8 +44,6 @@ RUN mkdir -p /tmp && \
     chmod -R u+rwx,g+rw,o+r /tmp && \
     chown -R appuser:appgroup /tmp
 
-RUN chmod -R u+w /usr/share/nginx/html
-
 # Remove the `user` directive from NGINX configuration to avoid warnings
 RUN sed -i '/^user/d' /etc/nginx/nginx.conf
 
@@ -54,12 +52,7 @@ COPY --from=build /workspace/dist /usr/share/nginx/html
 COPY default.conf /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Add entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 USER appuser
 
 EXPOSE 80
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

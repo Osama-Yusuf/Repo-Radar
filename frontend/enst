@@ -1,0 +1,3 @@
+echo $1
+docker rmi -f osamayusuf/repo-radar_frontend:$1
+docker build -t osamayusuf/repo-radar_frontend:$1 . && docker push osamayusuf/repo-radar_frontend:$1
