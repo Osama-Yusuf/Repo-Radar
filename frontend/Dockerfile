@@ -9,13 +9,13 @@ USER root
 RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000680000 appuser
 
 RUN mkdir -p /workspace
-# Set permissions
-RUN chmod -R u+rwx,g+rw,o+r /workspace
-RUN chown -R appuser:appgroup /workspace
 
 WORKDIR /workspace
 COPY package.json ./
 RUN yarn install 
+# Set permissions
+RUN chmod -R u+rwx,g+rw,o+r /workspace
+RUN chown -R appuser:appgroup /workspace
 
 COPY . ./
 
