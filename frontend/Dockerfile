@@ -7,6 +7,7 @@ FROM node:23.5.0-slim
 USER root
 # RUN apk add --no-cache shadow
 RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000680000 appuser
+RUN apt update -y && apt install curl -y
 
 RUN mkdir -p /workspace
 
@@ -24,4 +25,4 @@ USER appuser
 
 EXPOSE 5173
 
-CMD ["yarn", "dev"]
+CMD ["yarn", "dev", "--host"]

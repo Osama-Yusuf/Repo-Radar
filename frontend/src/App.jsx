@@ -56,12 +56,11 @@ import {
 import axios from 'axios'
 import './App.css'
 
-const PORT = process.env.PORT || '3001';
+const PORT = import.meta.env.VITE_PORT || '3001';
 
-const API_BASE_URL = process.env.BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 console.log(`API_BASE_URL: ${API_BASE_URL}`);
-
 
 function App() {
   const [projects, setProjects] = useState([])
