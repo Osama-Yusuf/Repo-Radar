@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -27,8 +27,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
-} from '@mui/material'
+  InputLabel,
+} from '@mui/material';
 import {
   Timeline,
   TimelineItem,
@@ -37,7 +37,7 @@ import {
   TimelineDot,
   TimelineConnector,
   TimelineContent,
-} from '@mui/lab'
+} from '@mui/lab';
 import {
   GitHub as GitHubIcon,
   Add as AddIcon,
@@ -52,61 +52,67 @@ import {
   Settings as SettingsIcon,
   Webhook as WebhookIcon,
   Terminal as TerminalIcon,
-} from '@mui/icons-material'
-import axios from 'axios'
-import './App.css'
+} from '@mui/icons-material';
+import axios from 'axios';
+import https from 'https';
+import './App.css';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
-
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 console.log(`API_BASE_URL: ${API_BASE_URL}`);
 
+// Create an instance of Axios with a custom agent
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  httpsAgent,
+});
+
 function App() {
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [openDialog, setOpenDialog] = useState(false)
-  const [openLogsDialog, setOpenLogsDialog] = useState(false)
-  const [selectedProject, setSelectedProject] = useState(null)
-  const [projectLogs, setProjectLogs] = useState([])
-  const [loadingLogs, setLoadingLogs] = useState(false)
-  const [editingProject, setEditingProject] = useState(null)
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [openLogsDialog, setOpenLogsDialog] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectLogs, setProjectLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     repoUrl: '',
     branches: '',
-    checkInterval: 5
-  })
+    checkInterval: 5,
+  });
 
-  // New state for actions and secrets
-  const [openActionDialog, setOpenActionDialog] = useState(false)
-  const [editingAction, setEditingAction] = useState(null)
+  const [openActionDialog, setOpenActionDialog] = useState(false);
+  const [editingAction, setEditingAction] = useState(null);
   const [actionFormData, setActionFormData] = useState({
     name: '',
     action_type: 'webhook', // 'webhook' or 'script'
     webhook_url: '',
-    script_content: ''
-  })
-  const [secrets, setSecrets] = useState([])
-  const [newSecret, setNewSecret] = useState({ name: '', value: '' })
+    script_content: '',
+  });
+  const [secrets, setSecrets] = useState([]);
+  const [newSecret, setNewSecret] = useState({ name: '', value: '' });
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/projects`)
-      setProjects(response.data)
-      setLoading(false)
+      const response = await axiosInstance.get('/projects');
+      setProjects(response.data);
+      setLoading(false);
     } catch (err) {
-      setError(err.message)
-      setLoading(false)
+      setError(err.message);
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchProjects()
-    const interval = setInterval(fetchProjects, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    fetchProjects();
+    const interval = setInterval(fetchProjects, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleOpenDialog = (project = null) => {
     if (project) {
@@ -114,69 +120,69 @@ function App() {
         name: project.name,
         repoUrl: project.repo_url,
         branches: project.branches.join(','),
-        checkInterval: project.check_interval
-      })
-      setEditingProject(project)
+        checkInterval: project.check_interval,
+      });
+      setEditingProject(project);
     } else {
       setFormData({
         name: '',
         repoUrl: '',
         branches: '',
-        checkInterval: 5
-      })
-      setEditingProject(null)
+        checkInterval: 5,
+      });
+      setEditingProject(null);
     }
-    setOpenDialog(true)
-  }
+    setOpenDialog(true);
+  };
 
   const handleCloseDialog = () => {
-    setOpenDialog(false)
-    setEditingProject(null)
-  }
+    setOpenDialog(false);
+    setEditingProject(null);
+  };
 
   const handleSubmit = async () => {
     try {
       const projectData = {
         name: formData.name,
         repoUrl: formData.repoUrl,
-        branches: formData.branches.split(',').map(b => b.trim()).filter(b => b),
-        checkInterval: parseInt(formData.checkInterval)
-      }
+        branches: formData.branches.split(',').map((b) => b.trim()).filter((b) => b),
+        checkInterval: parseInt(formData.checkInterval),
+      };
 
       if (editingProject) {
-        await axios.put(`${API_BASE_URL}/projects/${editingProject.id}`, projectData)
+        await axiosInstance.put(`/projects/${editingProject.id}`, projectData);
       } else {
-        await axios.post(`${API_BASE_URL}/projects`, projectData)
+        await axiosInstance.post('/projects', projectData);
       }
 
-      handleCloseDialog()
-      fetchProjects()
+      handleCloseDialog();
+      fetchProjects();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_BASE_URL}/projects/${id}`)
-      fetchProjects()
+      await axiosInstance.delete(`/projects/${id}`);
+      fetchProjects();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };
 
   const handleOpenLogs = async (project) => {
-    setSelectedProject(project)
-    setOpenLogsDialog(true)
-    setLoadingLogs(true)
+    setSelectedProject(project);
+    setOpenLogsDialog(true);
+    setLoadingLogs(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/projects/${project.id}/logs`)
-      setProjectLogs(response.data)
+      const response = await axiosInstance.get(`/projects/${project.id}/logs`);
+      setProjectLogs(response.data);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-    setLoadingLogs(false)
-  }
+    setLoadingLogs(false);
+  };
 
   const getStatusColor = (status) => {
     if (status === 'changed') return '#4caf50'
@@ -233,66 +239,66 @@ function App() {
         name: actionFormData.name,
         actionType: actionFormData.action_type,
         webhookUrl: actionFormData.webhook_url || null,
-        scriptContent: actionFormData.script_content || null
-      }
-
+        scriptContent: actionFormData.script_content || null,
+      };
+  
       if (editingAction) {
-        await axios.put(`${API_BASE_URL}/projects/${selectedProject.id}/actions/${editingAction.id}`, actionData)
+        await axiosInstance.put(`/projects/${selectedProject.id}/actions/${editingAction.id}`, actionData);
       } else {
-        await axios.post(`${API_BASE_URL}/projects/${selectedProject.id}/actions`, actionData)
+        await axiosInstance.post(`/projects/${selectedProject.id}/actions`, actionData);
       }
-
-      await fetchProjects()
-      handleCloseActionDialog()
+  
+      await fetchProjects();
+      handleCloseActionDialog();
     } catch (err) {
-      console.error('Error saving action:', err)
-      setError(err.response?.data?.error || err.message)
+      console.error('Error saving action:', err);
+      setError(err.response?.data?.error || err.message);
     }
-  }
-
+  };
+  
   const handleDeleteAction = async (actionId, projectId, e) => {
-    e.stopPropagation()
+    e.stopPropagation();
     try {
-      await axios.delete(`${API_BASE_URL}/projects/${projectId}/actions/${actionId}`)
-      await fetchProjects() // Fetch all projects
+      await axiosInstance.delete(`/projects/${projectId}/actions/${actionId}`);
+      await fetchProjects(); // Fetch all projects
       // Update the selected project in the dialog
       if (selectedProject) {
-        const updatedProject = await axios.get(`${API_BASE_URL}/projects/${projectId}`)
-        setSelectedProject(updatedProject.data)
+        const updatedProject = await axiosInstance.get(`/projects/${projectId}`);
+        setSelectedProject(updatedProject.data);
       }
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
-
+  };
+  
   const loadSecrets = async (actionId) => {
-    if (!actionId) return
+    if (!actionId) return;
     try {
-      const response = await axios.get(`${API_BASE_URL}/actions/${actionId}/secrets`)
-      setSecrets(response.data)
+      const response = await axiosInstance.get(`/actions/${actionId}/secrets`);
+      setSecrets(response.data);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
-
+  };
+  
   const handleAddSecret = async () => {
     try {
-      await axios.post(`${API_BASE_URL}/actions/${editingAction.id}/secrets`, newSecret)
-      setNewSecret({ name: '', value: '' })
-      loadSecrets(editingAction.id)
+      await axiosInstance.post(`/actions/${editingAction.id}/secrets`, newSecret);
+      setNewSecret({ name: '', value: '' });
+      loadSecrets(editingAction.id);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
-
+  };
+  
   const handleDeleteSecret = async (secretId) => {
     try {
-      await axios.delete(`${API_BASE_URL}/actions/${editingAction.id}/secrets/${secretId}`)
-      loadSecrets(editingAction.id)
+      await axiosInstance.delete(`/actions/${editingAction.id}/secrets/${secretId}`);
+      loadSecrets(editingAction.id);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };  
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
