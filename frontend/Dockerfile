@@ -10,6 +10,7 @@ RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000680000 appuser
 RUN apt update -y && apt install curl -y
 
 RUN mkdir -p /workspace
+RUN mkdir -p /tmp
 
 WORKDIR /workspace
 COPY package.json ./
@@ -20,6 +21,8 @@ COPY . ./
 # Set permissions
 RUN chmod -R u+rwx,g+rw,o+r /workspace
 RUN chown -R appuser:appgroup /workspace
+RUN chmod -R u+rwx,g+rw,o+r /tmp
+RUN chown -R appuser:appgroup /tmp
 
 USER appuser
 
