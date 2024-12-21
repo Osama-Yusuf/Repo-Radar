@@ -13,11 +13,12 @@ RUN mkdir -p /workspace
 WORKDIR /workspace
 COPY package.json ./
 RUN yarn install 
+
+COPY . ./
+
 # Set permissions
 RUN chmod -R u+rwx,g+rw,o+r /workspace
 RUN chown -R appuser:appgroup /workspace
-
-COPY . ./
 
 USER appuser
 
