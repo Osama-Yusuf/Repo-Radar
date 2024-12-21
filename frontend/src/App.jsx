@@ -54,7 +54,6 @@ import {
   Terminal as TerminalIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
-import https from 'https';
 import './App.css';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
@@ -63,10 +62,9 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:
 console.log(`API_BASE_URL: ${API_BASE_URL}`);
 
 // Create an instance of Axios with a custom agent
-const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+// Create an instance of Axios without https.Agent (for browser compatibility)
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  httpsAgent,
 });
 
 function App() {
