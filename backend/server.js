@@ -3,13 +3,22 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { Octokit } = require('@octokit/rest');
-const axios = require('axios');
 const fs = require('fs').promises;
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 require('dotenv').config();
 const swaggerUi = require('swagger-ui-express');
 const specs = require('./swagger');
+
+const axios = require('axios');
+const https = require('https');
+
+// Create a custom Axios instance with an agent to ignore self-signed certificates
+const axiosInstance = axios.create({
+  httpsAgent: new https.Agent({
+    rejectUnauthorized: false, // Ignore self-signed certificates
+  }),
+});
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -272,19 +281,24 @@ async function checkProjectChanges(project) {
                     for (const action of actions) {
                         try {
                             if (action.webhook_url) {
-                                // Execute webhook action
-                                await axios.post(action.webhook_url, {
+                                try {
+                                    // Execute webhook action
+                                    await axiosInstance.post(action.webhook_url, {
                                     project: project.name,
                                     branch: branch.branch_name,
                                     commit: {
                                         sha: latestCommit.sha,
                                         message: latestCommit.commit.message,
                                         author: latestCommit.commit.author.name,
-                                        date: latestCommit.commit.author.date
-                                    }
-                                });
+                                        date: latestCommit.commit.author.date,
+                                    },
+                                    });
+                                    console.log(`Successfully executed action for ${project.name}`);
+                                } catch (error) {
+                                    console.error(`Failed to execute action for ${project.name}:`, error.message);
+                                    throw error; // Optionally rethrow to handle it higher up
+                                }
                             }
-
                             if (action.script_content) {
                                 // Get action secrets
                                 const secrets = await allAsync(db, 'SELECT name, value FROM secrets WHERE action_id = ?', [action.id]);
