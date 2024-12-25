@@ -3,7 +3,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { Octokit } = require('@octokit/rest');
-const axios = require('axios');
 const fs = require('fs').promises;
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
@@ -11,12 +10,23 @@ require('dotenv').config();
 const swaggerUi = require('swagger-ui-express');
 const specs = require('./swagger');
 
+const axios = require('axios');
+const https = require('https');
+
+// Create a custom Axios instance with an agent to ignore self-signed certificates
+const axiosInstance = axios.create({
+    httpsAgent: new https.Agent({
+        rejectUnauthorized: false, // Ignore self-signed certificates
+    }),
+});
+
 const app = express();
 const port = process.env.PORT || 3001;
+const ghToken = process.env.GITHUB_TOKEN;
 
 // Initialize Octokit
 const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN,
+    auth: ghToken,
     userAgent: 'github-watcher-app v1.0',
     baseUrl: 'https://api.github.com'
 });
@@ -67,7 +77,7 @@ async function initializeDatabase() {
 // Promisify database operations
 function runAsync(db, sql, params = []) {
     return new Promise((resolve, reject) => {
-        db.run(sql, params, function(err) {
+        db.run(sql, params, function (err) {
             if (err) reject(err);
             else resolve(this);
         });
@@ -210,7 +220,7 @@ function setupProjectTimer(project) {
 
     // Convert check interval from minutes to milliseconds
     const intervalMs = project.check_interval * 60 * 1000;
-    
+
     // Create new timer
     const timerId = setInterval(async () => {
         try {
@@ -228,7 +238,7 @@ function setupProjectTimer(project) {
 // Function to check a single project
 async function checkProjectChanges(project) {
     console.log(`Checking project ${project.name}...`);
-    
+
     try {
         const branches = await allAsync(db, 'SELECT * FROM branches WHERE project_id = ?', [project.id]);
 
@@ -244,7 +254,7 @@ async function checkProjectChanges(project) {
                 const latestCommit = response.data.commit;
                 if (latestCommit.sha !== branch.last_commit_sha) {
                     console.log(`Changes detected in ${project.name}/${branch.branch_name}`);
-                    
+
                     // Update branch with new commit SHA
                     await runAsync(db, 'UPDATE branches SET last_commit_sha = ? WHERE id = ?', [latestCommit.sha, branch.id]);
 
@@ -272,34 +282,39 @@ async function checkProjectChanges(project) {
                     for (const action of actions) {
                         try {
                             if (action.webhook_url) {
-                                // Execute webhook action
-                                await axios.post(action.webhook_url, {
-                                    project: project.name,
-                                    branch: branch.branch_name,
-                                    commit: {
-                                        sha: latestCommit.sha,
-                                        message: latestCommit.commit.message,
-                                        author: latestCommit.commit.author.name,
-                                        date: latestCommit.commit.author.date
-                                    }
-                                });
+                                try {
+                                    // Execute webhook action
+                                    await axiosInstance.post(action.webhook_url, {
+                                        project: project.name,
+                                        branch: branch.branch_name,
+                                        commit: {
+                                            sha: latestCommit.sha,
+                                            message: latestCommit.commit.message,
+                                            author: latestCommit.commit.author.name,
+                                            date: latestCommit.commit.author.date,
+                                        },
+                                    });
+                                    console.log(`Successfully executed action for ${project.name}`);
+                                } catch (error) {
+                                    console.error(`Failed to execute action for ${project.name}:`, error.message);
+                                    throw error; // Optionally rethrow to handle it higher up
+                                }
                             }
-
                             if (action.script_content) {
                                 // Get action secrets
                                 const secrets = await allAsync(db, 'SELECT name, value FROM secrets WHERE action_id = ?', [action.id]);
-                                
+
                                 // Create environment variables string
                                 const envVars = secrets.map(secret => `export ${secret.name}="${secret.value}"`).join('\n');
-                                
+
                                 // Combine env vars with script content
                                 const fullScriptContent = `#!/bin/bash\n\n# Set environment variables\n${envVars}\n\n# Main script\n${action.script_content}`;
-                                
+
                                 // Execute bash script
                                 const scriptPath = `/tmp/action_${action.id}_${Date.now()}.sh`;
                                 await fs.promises.writeFile(scriptPath, fullScriptContent);
                                 await fs.promises.chmod(scriptPath, '755');
-                                
+
                                 try {
                                     const { stdout, stderr } = await util.promisify(exec)(scriptPath);
                                     console.log(`Script output for action ${action.id}:`, stdout);
@@ -336,7 +351,7 @@ async function initializeProjectTimers() {
         for (const project of projects) {
             setupProjectTimer(project);
         }
-        
+
         console.log(`Initialized timers for ${projects.length} projects`);
     } catch (error) {
         console.error('Error initializing project timers:', error);
@@ -389,7 +404,7 @@ app.get('/api/projects', async (req, res) => {
                 actions: actions || []
             };
         }));
-        
+
         res.json(projectsWithActions);
     } catch (err) {
         console.error('Error fetching projects:', err);
@@ -442,7 +457,7 @@ app.get('/api/projects', async (req, res) => {
  */
 app.post('/api/projects', async (req, res) => {
     const { name, repoUrl, branches, checkInterval } = req.body;
-    
+
     if (checkInterval && checkInterval < 1) {
         return res.status(400).json({ error: 'Check interval must be at least 1 minute' });
     }
@@ -496,7 +511,7 @@ app.post('/api/projects', async (req, res) => {
  */
 app.get('/api/projects/:projectId/actions', async (req, res) => {
     const { projectId } = req.params;
-    
+
     try {
         const actions = await allAsync(db, 'SELECT * FROM actions WHERE project_id = ?', [projectId]);
         res.json(actions);
@@ -556,7 +571,7 @@ app.post('/api/projects/:projectId/actions', (req, res) => {
     db.run(
         'INSERT INTO actions (project_id, name, action_type, webhook_url, script_content) VALUES (?, ?, ?, ?, ?)',
         [projectId, name || null, actionType, webhookUrl, scriptContent],
-        function(err) {
+        function (err) {
             if (err) {
                 console.error('Error creating action:', err);
                 res.status(500).json({ error: err.message });
@@ -748,7 +763,7 @@ app.put('/api/projects/:id', async (req, res) => {
  */
 app.get('/api/projects/:id', async (req, res) => {
     const { id } = req.params;
-    
+
     try {
         // Get project
         const project = await getAsync(db, 'SELECT * FROM projects WHERE id = ?', [id]);
@@ -823,7 +838,7 @@ app.delete('/api/projects/:projectId/actions/:actionId', async (req, res) => {
 // Secrets endpoints
 app.get('/api/actions/:actionId/secrets', async (req, res) => {
     const { actionId } = req.params;
-    
+
     try {
         const secrets = await allAsync(db, 'SELECT id, name, created_at FROM secrets WHERE action_id = ?', [actionId]);
         res.json(secrets);

@@ -29,6 +29,14 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
   - Real-time status updates
   - Comprehensive activity logs
 
+## 📸 Screenshots
+
+![Screenshot 1](./SCs/1.png)
+![Screenshot 2](./SCs/2.png)
+![Screenshot 3](./SCs/3.png)
+![Screenshot 4](./SCs/4.png)
+![Screenshot 5](./SCs/5.png)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
