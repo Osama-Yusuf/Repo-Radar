@@ -54,7 +54,7 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
 
 2. **Update .env file**
    ```bash
-   cp .env.example .env    # Configure your GitHub token
+   cp .env.example .env    # Configure your envs
    ```
 
 3. **Build and Run Docker Compose**
@@ -79,7 +79,7 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
    ```bash
    cd backend
    npm install
-   cp .env.example .env    # Configure your GitHub token
+   cp .env.example .env    # Configure your envs
    npm run dev
    ```
 
@@ -87,6 +87,7 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
    ```bash
    cd ../frontend
    npm install
+   cp .env.example .env    # Configure your envs
    npm run dev
    ```
 
