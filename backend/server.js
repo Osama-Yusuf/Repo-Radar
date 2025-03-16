@@ -275,36 +275,43 @@ async function checkProjectChanges(project) {
                         'CHANGE_DETECTED'
                     ]);
 
-                    // Execute actions for this project
+                    // Execute actions for this project, but only for the changed branch
                     const actions = await allAsync(db, 'SELECT * FROM actions WHERE project_id = ?', [project.id]);
 
                     for (const action of actions) {
                         try {
                             if (action.webhook_url) {
                                 try {
-                                    // Execute webhook action
+                                    // Execute webhook action only for the current branch
                                     await axiosInstance.post(action.webhook_url, {
-                                    project: project.name,
-                                    branch: branch.branch_name,
-                                    commit: {
-                                        sha: latestCommit.sha,
-                                        message: latestCommit.commit.message,
-                                        author: latestCommit.commit.author.name,
-                                        date: latestCommit.commit.author.date,
-                                    },
+                                        project: project.name,
+                                        branch: branch.branch_name,  // This is now specific to the changed branch
+                                        commit: {
+                                            sha: latestCommit.sha,
+                                            message: latestCommit.commit.message,
+                                            author: latestCommit.commit.author.name,
+                                            date: latestCommit.commit.author.date,
+                                        },
                                     });
-                                    console.log(`Successfully executed action for ${project.name}`);
+                                    console.log(`Successfully executed webhook action for ${project.name}/${branch.branch_name}`);
                                 } catch (error) {
-                                    console.error(`Failed to execute action for ${project.name}:`, error.message);
-                                    throw error; // Optionally rethrow to handle it higher up
+                                    console.error(`Failed to execute webhook action for ${project.name}/${branch.branch_name}:`, error.message);
+                                    throw error;
                                 }
                             }
                             if (action.script_content) {
                                 // Get action secrets
                                 const secrets = await allAsync(db, 'SELECT name, value FROM secrets WHERE action_id = ?', [action.id]);
 
-                                // Create environment variables string
-                                const envVars = secrets.map(secret => `export ${secret.name}="${secret.value}"`).join('\n');
+                                // Create environment variables string including the branch name
+                                const envVars = [
+                                    ...secrets.map(secret => `export ${secret.name}="${secret.value}"`),
+                                    `export BRANCH_NAME="${branch.branch_name}"`,  // Make branch name available to scripts
+                                    `export COMMIT_SHA="${latestCommit.sha}"`,
+                                    `export COMMIT_MESSAGE="${latestCommit.commit.message.replace(/"/g, '\\"')}"`,
+                                    `export COMMIT_AUTHOR="${latestCommit.commit.author.name}"`,
+                                    `export COMMIT_DATE="${latestCommit.commit.author.date}"`
+                                ].join('\n');
 
                                 // Combine env vars with script content
                                 const fullScriptContent = `#!/bin/bash\n\n# Set environment variables\n${envVars}\n\n# Main script\n${action.script_content}`;
@@ -316,15 +323,15 @@ async function checkProjectChanges(project) {
 
                                 try {
                                     const { stdout, stderr } = await util.promisify(exec)(scriptPath);
-                                    console.log(`Script output for action ${action.id}:`, stdout);
-                                    if (stderr) console.error(`Script error for action ${action.id}:`, stderr);
+                                    console.log(`Script output for action ${action.id} on branch ${branch.branch_name}:`, stdout);
+                                    if (stderr) console.error(`Script error for action ${action.id} on branch ${branch.branch_name}:`, stderr);
                                 } finally {
                                     // Clean up the temporary script file
                                     await fs.promises.unlink(scriptPath).catch(console.error);
                                 }
                             }
                         } catch (actionError) {
-                            console.error(`Error executing action ${action.id}:`, actionError);
+                            console.error(`Error executing action ${action.id} for branch ${branch.branch_name}:`, actionError);
                         }
                     }
                 }
