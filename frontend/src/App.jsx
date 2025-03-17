@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Grid, Typography, CircularProgress } from '@mui/material';
+import { Container, Grid, Typography, CircularProgress, Box, Button } from '@mui/material';
 import axios from 'axios';
 import './App.css';
 
@@ -23,6 +23,7 @@ function App() {
   // Project State
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -32,6 +33,8 @@ function App() {
     branches: '',
     checkInterval: 5,
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ field: 'name', direction: 'asc' });
 
   // Action State
   const [openActionDialog, setOpenActionDialog] = useState(false);
@@ -52,22 +55,89 @@ function App() {
   const [projectLogs, setProjectLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    }
     try {
       const response = await axiosInstance.get('/projects');
       setProjects(response.data);
-      setLoading(false);
+      setError(null);
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     fetchProjects();
-    const interval = setInterval(fetchProjects, 30000);
+    const interval = setInterval(() => fetchProjects(), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Search and Sort Functions
+  const handleSearch = (query) => {
+    setSearchQuery(query.toLowerCase());
+  };
+
+  const handleSort = (field) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const filterProjects = (projects) => {
+    return projects.filter(project => {
+      const searchFields = [
+        project.name.toLowerCase(),
+        project.repo_url.toLowerCase(),
+        ...(project.branches || []).map(b => b.toLowerCase()),
+        ...(project.actions || []).map(a => [
+          a.name.toLowerCase(),
+          a.webhookUrl?.toLowerCase() || '',
+          a.scriptContent?.toLowerCase() || '',
+          ...(a.webhookParams || []).map(p => `${p.name}:${p.value}`.toLowerCase())
+        ]).flat()
+      ];
+      return searchFields.some(field => field.includes(searchQuery));
+    });
+  };
+
+  const sortProjects = (projects) => {
+    return [...projects].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortConfig.field) {
+        case 'name':
+          aValue = a.name;
+          bValue = b.name;
+          break;
+        case 'branches':
+          aValue = (a.branches || []).length;
+          bValue = (b.branches || []).length;
+          break;
+        case 'actions':
+          aValue = (a.actions || []).length;
+          bValue = (b.actions || []).length;
+          break;
+        case 'updated':
+          aValue = new Date(a.updated_at || 0).getTime();
+          bValue = new Date(b.updated_at || 0).getTime();
+          break;
+        default:
+          aValue = a[sortConfig.field];
+          bValue = b[sortConfig.field];
+      }
+
+      if (sortConfig.direction === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      }
+      return aValue < bValue ? 1 : -1;
+    });
+  };
 
   // Project Handlers
   const handleOpenDialog = (project = null) => {
@@ -356,12 +426,54 @@ function App() {
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
       color: '#fff'
     }}>
-      <Header onRefresh={fetchProjects} onAddProject={() => handleOpenDialog()} />
+      <Header 
+        onRefresh={() => fetchProjects(true)} 
+        onAddProject={() => handleOpenDialog()} 
+        isRefreshing={refreshing}
+        onSearch={handleSearch}
+      />
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Typography variant="h4" sx={{ mb: 3, fontWeight: 600, color: '#fff' }}>
-          Monitored Repositories
-        </Typography>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 3 
+        }}>
+          <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
+            Monitored Repositories
+          </Typography>
+          
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {[
+              { label: 'Name', field: 'name' },
+              { label: 'Branches', field: 'branches' },
+              { label: 'Actions', field: 'actions' },
+              { label: 'Last Updated', field: 'updated' }
+            ].map(({ label, field }) => (
+              <Button
+                key={field}
+                size="small"
+                onClick={() => handleSort(field)}
+                sx={{
+                  color: sortConfig.field === field ? '#2196f3' : 'rgba(255, 255, 255, 0.7)',
+                  minWidth: 'auto',
+                  px: 2,
+                  '&:hover': {
+                    color: '#2196f3'
+                  }
+                }}
+                endIcon={sortConfig.field === field ? (
+                  <Typography component="span" sx={{ fontSize: '0.8rem', ml: 0.5 }}>
+                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                  </Typography>
+                ) : null}
+              >
+                {label}
+              </Button>
+            ))}
+          </Box>
+        </Box>
 
         {loading ? (
           <Typography>Loading projects...</Typography>
@@ -369,19 +481,42 @@ function App() {
           <Typography color="error">{error}</Typography>
         ) : (
           <Grid container spacing={3}>
-            {projects.map((project) => (
-              <Grid item xs={12} key={project.id}>
-                <ProjectCard
-                  project={project}
-                  onOpenLogs={handleOpenLogs}
-                  onOpenActionDialog={handleOpenActionDialog}
-                  onEditProject={handleOpenDialog}
-                  onDeleteProject={handleDelete}
-                  onDeleteAction={handleDeleteAction}
-                  onTriggerAction={handleTriggerAction}
-                />
+            {projects.length === 0 ? (
+              <Grid item xs={12} sx={{ textAlign: 'center', mt: 8 }}>
+                <Typography variant="h5" sx={{ color: '#8b8da0', mb: 2 }}>
+                  No repositories monitored yet
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#6b6d7c', mb: 4 }}>
+                  Click the "Add Project" button above to start monitoring your first repository
+                </Typography>
+                <div style={{ 
+                  width: '60px',
+                  height: '60px',
+                  margin: '0 auto',
+                  border: '3px dashed #2d325a',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Typography variant="h4" sx={{ color: '#2d325a' }}>+</Typography>
+                </div>
               </Grid>
-            ))}
+            ) : (
+              sortProjects(filterProjects(projects)).map((project) => (
+                <Grid item xs={12} key={project.id}>
+                  <ProjectCard
+                    project={project}
+                    onOpenLogs={handleOpenLogs}
+                    onOpenActionDialog={handleOpenActionDialog}
+                    onEditProject={handleOpenDialog}
+                    onDeleteProject={handleDelete}
+                    onDeleteAction={handleDeleteAction}
+                    onTriggerAction={handleTriggerAction}
+                  />
+                </Grid>
+              ))
+            )}
           </Grid>
         )}
       </Container>
