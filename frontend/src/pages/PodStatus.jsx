@@ -145,9 +145,22 @@ const PodStatus = () => {
   const filteredPods = pods.filter(pod => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
+    
+    // Extract commit hash from image if it exists
+    const commitHash = pod.image ? (pod.image.match(/:([a-f0-9]{7})--/) || [])[1] : '';
+    
+    // Clean up the search query to handle various formats
+    const cleanQuery = query.replace(/[^a-f0-9]/g, '');
+    
     return (
       pod.name.toLowerCase().includes(query) ||
-      pod.status.toLowerCase().includes(query)
+      pod.status.toLowerCase().includes(query) ||
+      (commitHash && (
+        // Match original query (might include special characters)
+        commitHash.includes(query) ||
+        // Match cleaned query (only alphanumeric)
+        (cleanQuery.length > 0 && commitHash.includes(cleanQuery))
+      ))
     );
   });
 
