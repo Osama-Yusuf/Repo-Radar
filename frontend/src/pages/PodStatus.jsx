@@ -15,7 +15,11 @@ import {
   IconButton,
   FormControl,
   Select,
-  MenuItem
+  MenuItem,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   Terminal as LogsIcon,
@@ -23,9 +27,12 @@ import {
   Warning as WarningIcon,
   Pending as PendingIcon,
   PlayArrow as RunningIcon,
+  GitHub as GitHubIcon,
   Error as ErrorIcon,
   AccessTime,
-  GitHub
+  GitHub,
+  Memory as MemoryIcon,
+  Speed as SpeedIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
@@ -403,13 +410,152 @@ const PodStatus = () => {
                 </Box>
 
                 <Grid container spacing={2}>
+                  {pod.resources && pod.resources.length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: 'rgba(255, 255, 255, 0.5)',
+                          display: 'block',
+                          mb: 1
+                        }}
+                      >
+                        Resources
+                      </Typography>
+                      {pod.resources.map((container, index) => (
+                        <Box 
+                          key={container.name}
+                          sx={{ 
+                            mb: index !== pod.resources.length - 1 ? 2 : 0,
+                            pb: index !== pod.resources.length - 1 ? 2 : 0,
+                            borderBottom: index !== pod.resources.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              display: 'block',
+                              mb: 1,
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            {container.name}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                            <Tooltip title="CPU Usage/Limit" placement="top" arrow>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  px: 1.5,
+                                  py: 0.75,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(33, 150, 243, 0.1)',
+                                  border: '1px solid rgba(33, 150, 243, 0.2)'
+                                }}
+                              >
+                                <SpeedIcon sx={{ 
+                                  color: '#2196f3',
+                                  fontSize: '1.2rem'
+                                }} />
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    color: '#2196f3',
+                                    fontWeight: 500,
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  {`${container.usage.cpu}/${container.limits.cpu}`}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                            <Tooltip title="Memory Usage/Limit" placement="top" arrow>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  px: 1.5,
+                                  py: 0.75,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(156, 39, 176, 0.1)',
+                                  border: '1px solid rgba(156, 39, 176, 0.2)'
+                                }}
+                              >
+                                <MemoryIcon sx={{ 
+                                  color: '#9c27b0',
+                                  fontSize: '1.2rem'
+                                }} />
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    color: '#9c27b0',
+                                    fontWeight: 500,
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  {`${container.usage.memory}/${container.limits.memory}`}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Grid>
+                  )}
+                  {pod.commit && pod.commit !== 'N/A' && (
+                    <Grid item xs={12} sx={{ mt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', pt: 2 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}
+                      >
+                        <Tooltip title="Latest deployed commit hash" placement="top" arrow>
+                          <Box
+                            component="span"
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              px: 1.5,
+                              py: 0.75,
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                              border: '1px solid rgba(33, 150, 243, 0.2)',
+                              color: '#2196f3',
+                              fontSize: '0.85rem',
+                              fontFamily: 'monospace',
+                              letterSpacing: '0.5px',
+                              fontWeight: 500,
+                              cursor: 'default',
+                              transition: 'all 0.2s ease-in-out',
+                              '&:hover': {
+                                backgroundColor: 'rgba(33, 150, 243, 0.15)',
+                                borderColor: 'rgba(33, 150, 243, 0.3)',
+                                transform: 'translateY(-1px)'
+                              }
+                            }}
+                          >
+                            <GitHub sx={{ fontSize: '1rem', mr: 0.5, opacity: 0.7 }} />
+                            <Typography component="span" sx={{ opacity: 0.7, mr: 0.5, fontSize: '0.8rem' }}>
+                              commit
+                            </Typography>
+                            {pod.commit}
+                          </Box>
+                        </Tooltip>
+                      </Box>
+                    </Grid>
+                  )}
                   <Grid item xs={4}>
                     <Typography 
                       variant="caption" 
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.5)',
-                        display: 'block',
-                        mb: 0.5
+                        display: 'block'
                       }}
                     >
                       Ready
