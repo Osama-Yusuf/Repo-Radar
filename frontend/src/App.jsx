@@ -41,7 +41,8 @@ function App() {
     name: '',
     actionType: 'webhook',
     webhookUrl: '',
-    scriptContent: ''
+    scriptContent: '',
+    webhookParams: {}
   });
   const [secrets, setSecrets] = useState([]);
   const [newSecret, setNewSecret] = useState({ name: '', value: '' });
@@ -128,23 +129,53 @@ function App() {
 
   // Action Handlers
   const handleOpenActionDialog = (project, action = null) => {
-    setSelectedProject(project);
+    const projectBranches = project.branches || [];
+    setSelectedProject({
+      ...project,
+      branches: projectBranches
+    });
+    
     if (action) {
+      console.log('Editing action:', action);
       setEditingAction(action);
+      
+      // Initialize webhook parameters from existing action
+      const webhookParams = {};
+      projectBranches.forEach(branch => {
+        webhookParams[branch] = action.webhookParams
+          ?.filter(param => param.branch === branch)
+          .map(param => ({ name: param.name, value: param.value })) || [];
+      });
+      
+      console.log('Initialized webhook params:', webhookParams);
+      
       setActionFormData({
         name: action.name || '',
         actionType: action.actionType,
         webhookUrl: action.webhookUrl || '',
-        scriptContent: action.scriptContent || ''
+        scriptContent: action.scriptContent || '',
+        webhookParams
       });
+      
       loadSecrets(action.id);
     } else {
+      console.log('Creating new action');
       setEditingAction(null);
+      
+      // Initialize empty webhook parameters for each branch
+      const webhookParams = {};
+      projectBranches.forEach(branch => {
+        webhookParams[branch] = [];
+      });
+      
+      console.log('Initialized empty webhook params:', webhookParams);
+      
       setActionFormData({
         name: '',
         actionType: 'webhook',
         webhookUrl: '',
-        scriptContent: ''
+        scriptContent: '',
+        webhookParams
       });
       setSecrets([]);
     }
@@ -159,7 +190,8 @@ function App() {
       name: '',
       actionType: 'webhook',
       webhookUrl: '',
-      scriptContent: ''
+      scriptContent: '',
+      webhookParams: {}
     });
     setSecrets([]);
     setNewSecret({ name: '', value: '' });
@@ -167,23 +199,65 @@ function App() {
 
   const handleSaveAction = async () => {
     try {
+      console.log('Starting to save action...');
+      console.log('Action Form Data:', JSON.stringify(actionFormData, null, 2));
+      
+      // Convert webhook parameters to array format for backend
+      const webhookParamsArray = [];
+      if (actionFormData.webhookParams) {
+        Object.entries(actionFormData.webhookParams).forEach(([branch, params]) => {
+          params.forEach(param => {
+            if (param.name && param.value) {
+              webhookParamsArray.push({
+                branch,
+                name: param.name,
+                value: param.value
+              });
+            }
+          });
+        });
+      }
+
+      console.log('Webhook Params Array:', webhookParamsArray);
+
       const actionData = {
         name: actionFormData.name,
         actionType: actionFormData.actionType,
         webhookUrl: actionFormData.webhookUrl || null,
         scriptContent: actionFormData.scriptContent || null,
+        webhookParams: webhookParamsArray.length > 0 ? webhookParamsArray : undefined
       };
 
+      console.log('Action Data to Send:', JSON.stringify(actionData, null, 2));
+      console.log('Selected Project:', selectedProject);
+      console.log('Editing Action:', editingAction);
+
+      let response;
+      const url = editingAction 
+        ? `/projects/${selectedProject.id}/actions/${editingAction.id}`
+        : `/projects/${selectedProject.id}/actions`;
+      
+      console.log('Request URL:', url);
+      console.log('Request Method:', editingAction ? 'PUT' : 'POST');
+
       if (editingAction) {
-        await axiosInstance.put(`/projects/${selectedProject.id}/actions/${editingAction.id}`, actionData);
+        response = await axiosInstance.put(url, actionData);
       } else {
-        await axiosInstance.post(`/projects/${selectedProject.id}/actions`, actionData);
+        response = await axiosInstance.post(url, actionData);
       }
+
+      console.log('Response from server:', response.data);
 
       await fetchProjects();
       handleCloseActionDialog();
     } catch (err) {
       console.error('Error saving action:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        headers: err.response?.headers
+      });
       setError(err.response?.data?.error || err.message);
     }
   };

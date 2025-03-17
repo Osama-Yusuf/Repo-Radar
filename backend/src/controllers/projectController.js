@@ -11,7 +11,11 @@ class ProjectController {
             const projects = await this.db.project.findMany({
                 include: {
                     branches: true,
-                    actions: true
+                    actions: {
+                        include: {
+                            webhookParams: true
+                        }
+                    }
                 }
             });
 
@@ -23,7 +27,10 @@ class ProjectController {
                 created_at: project.createdAt,
                 updated_at: project.updatedAt,
                 branches: project.branches.map(b => b.branchName),
-                actions: project.actions
+                actions: project.actions.map(action => ({
+                    ...action,
+                    webhookParams: action.webhookParams || []
+                }))
             }));
 
             res.json(projectsWithFormattedData);
@@ -41,7 +48,11 @@ class ProjectController {
                 where: { id: parseInt(id) },
                 include: {
                     branches: true,
-                    actions: true
+                    actions: {
+                        include: {
+                            webhookParams: true
+                        }
+                    }
                 }
             });
 
@@ -57,7 +68,10 @@ class ProjectController {
                 created_at: project.createdAt,
                 updated_at: project.updatedAt,
                 branches: project.branches.map(b => b.branchName),
-                actions: project.actions
+                actions: project.actions.map(action => ({
+                    ...action,
+                    webhookParams: action.webhookParams || []
+                }))
             };
 
             res.json(formattedProject);
@@ -312,6 +326,93 @@ class ProjectController {
         } catch (err) {
             console.error('Error triggering actions:', err);
             res.status(500).json({ error: 'Failed to trigger actions' });
+        }
+    }
+
+    async createAction(req, res) {
+        try {
+            const { projectId } = req.params;
+            const { name, actionType, webhookUrl, scriptContent, webhookParams } = req.body;
+
+            console.log('Creating action with data:', {
+                projectId,
+                name,
+                actionType,
+                webhookUrl,
+                scriptContent,
+                webhookParams
+            });
+
+            // Create action with webhook parameters
+            const action = await this.db.action.create({
+                data: {
+                    name,
+                    actionType,
+                    webhookUrl,
+                    scriptContent,
+                    projectId: parseInt(projectId),
+                    webhookParams: webhookParams?.length > 0 ? {
+                        createMany: {
+                            data: webhookParams
+                        }
+                    } : undefined
+                },
+                include: {
+                    webhookParams: true
+                }
+            });
+
+            console.log('Created action:', action);
+            res.json(action);
+        } catch (error) {
+            console.error('Error creating action:', error);
+            res.status(500).json({ error: 'Failed to create action' });
+        }
+    }
+
+    async updateAction(req, res) {
+        try {
+            const { actionId } = req.params;
+            const { name, actionType, webhookUrl, scriptContent, webhookParams } = req.body;
+
+            console.log('Updating action:', {
+                actionId,
+                name,
+                actionType,
+                webhookUrl,
+                scriptContent,
+                webhookParams
+            });
+
+            // First delete existing webhook parameters
+            await this.db.webhookParameter.deleteMany({
+                where: { actionId: parseInt(actionId) }
+            });
+
+            // Then update the action with new parameters
+            const action = await this.db.action.update({
+                where: { id: parseInt(actionId) },
+                data: {
+                    name,
+                    actionType,
+                    webhookUrl,
+                    scriptContent,
+                    webhookParams: webhookParams?.length > 0 ? {
+                        createMany: {
+                            data: webhookParams
+                        }
+                    } : undefined
+                },
+                include: {
+                    webhookParams: true
+                }
+            });
+
+            console.log('Updated action:', action);
+            res.json(action);
+        } catch (error) {
+            console.error('Error updating action:', error);
+            res.status(500).json({ error: 'Failed to update action' });
         }
     }
 }

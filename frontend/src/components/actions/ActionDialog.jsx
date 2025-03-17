@@ -131,6 +131,7 @@ const ActionDialog = ({
                 setNewSecret={setNewSecret}
                 onAddSecret={onAddSecret}
                 onDeleteSecret={onDeleteSecret}
+                branches={selectedProject?.branches || []}
               />
             </Box>
           </Grid>

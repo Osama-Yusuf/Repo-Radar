@@ -57,6 +57,7 @@ model Action {
   updatedAt     DateTime @default(now()) @map("updated_at")
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   secrets       Secret[]
+  webhookParams WebhookParameter[]
 
   @@map("actions")
 }
@@ -70,4 +71,17 @@ model Secret {
   action    Action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
 
   @@map("secrets")
+}
+
+model WebhookParameter {
+  id        Int      @id @default(autoincrement())
+  actionId  Int      @map("action_id")
+  branch    String
+  name      String
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  action    Action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_parameters")
+  @@unique([actionId, branch, name])
 }

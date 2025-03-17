@@ -21,13 +21,16 @@ class ActionController {
 
     async createAction(req, res) {
         const { projectId } = req.params;
-        const { name, actionType, webhookUrl, scriptContent } = req.body;
+        const { name, actionType, webhookUrl, scriptContent, webhookParams } = req.body;
 
         if (!actionType || (!webhookUrl && !scriptContent)) {
             return res.status(400).json({ error: 'Action type and either webhook URL or script content are required' });
         }
 
         try {
+            console.log('Creating action with webhook params:', webhookParams);
+
+            // Create action first
             const action = await this.db.action.create({
                 data: {
                     projectId: parseInt(projectId),
@@ -38,22 +41,53 @@ class ActionController {
                 }
             });
 
-            res.status(201).json(action);
+            // Then add webhook parameters if they exist
+            if (webhookParams && webhookParams.length > 0) {
+                await this.db.webhookParameter.createMany({
+                    data: webhookParams.map(param => ({
+                        actionId: action.id,
+                        branch: param.branch,
+                        name: param.name,
+                        value: param.value
+                    }))
+                });
+            }
+
+            // Fetch the complete action with webhook parameters
+            const actionWithParams = await this.db.action.findUnique({
+                where: { id: action.id },
+                include: { webhookParams: true }
+            });
+
+            console.log('Created action:', actionWithParams);
+            res.status(201).json(actionWithParams);
         } catch (err) {
             console.error('Error creating action:', err);
-            res.status(500).json({ error: err.message });
+            if (err.code === 'P2002') {
+                res.status(400).json({ error: 'Duplicate webhook parameter names are not allowed for the same branch' });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
         }
     }
 
     async updateAction(req, res) {
         const { projectId, actionId } = req.params;
-        const { name, actionType, webhookUrl, scriptContent } = req.body;
+        const { name, actionType, webhookUrl, scriptContent, webhookParams } = req.body;
 
         if (!actionType || (!webhookUrl && !scriptContent)) {
             return res.status(400).json({ error: 'Action type and either webhook URL or script content are required' });
         }
 
         try {
+            console.log('Updating action with webhook params:', webhookParams);
+            
+            // First delete existing webhook parameters
+            await this.db.webhookParameter.deleteMany({
+                where: { actionId: parseInt(actionId) }
+            });
+
+            // Update the action
             const action = await this.db.action.update({
                 where: {
                     id: parseInt(actionId),
@@ -72,10 +106,33 @@ class ActionController {
                 return res.status(404).json({ error: 'Action not found' });
             }
 
-            res.json(action);
+            // Add new webhook parameters if they exist
+            if (webhookParams && webhookParams.length > 0) {
+                await this.db.webhookParameter.createMany({
+                    data: webhookParams.map(param => ({
+                        actionId: action.id,
+                        branch: param.branch,
+                        name: param.name,
+                        value: param.value
+                    }))
+                });
+            }
+
+            // Fetch the complete action with webhook parameters
+            const actionWithParams = await this.db.action.findUnique({
+                where: { id: action.id },
+                include: { webhookParams: true }
+            });
+
+            console.log('Updated action:', actionWithParams);
+            res.json(actionWithParams);
         } catch (err) {
             console.error('Error updating action:', err);
-            res.status(500).json({ error: err.message });
+            if (err.code === 'P2002') {
+                res.status(400).json({ error: 'Duplicate webhook parameter names are not allowed for the same branch' });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
         }
     }
 
