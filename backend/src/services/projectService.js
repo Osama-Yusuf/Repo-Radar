@@ -274,6 +274,94 @@ class ProjectService {
         }
     }
 
+    async executeAction(project, action, branchName, isManualTrigger = false) {
+        try {
+            // Get branch details from GitHub
+            const repoUrl = project.repo_url || project.repoUrl;
+            if (!repoUrl) {
+                throw new Error('Repository URL is missing');
+            }
+
+            const branchDetails = await githubService.getBranchDetails(repoUrl, branchName);
+            if (!branchDetails) {
+                throw new Error('No branch details returned from GitHub');
+            }
+
+            const latestCommit = branchDetails.commit;
+
+            if (action.webhookUrl) {
+                await githubService.sendWebhook(action.webhookUrl, {
+                    project: project.name,
+                    branch: branchName,
+                    commit: {
+                        sha: latestCommit.sha,
+                        message: latestCommit.commit?.message || '',
+                        author: latestCommit.commit?.author?.name || '',
+                        date: latestCommit.commit?.author?.date || new Date().toISOString(),
+                    },
+                    trigger_type: isManualTrigger ? 'manual' : 'auto'
+                });
+            }
+
+            if (action.scriptContent) {
+                const secrets = await this.db.secret.findMany({
+                    where: { actionId: action.id }
+                });
+
+                const envVars = [
+                    ...secrets.map(secret => `export ${secret.name}="${secret.value}"`),
+                    `export BRANCH_NAME="${branchName}"`,
+                    `export COMMIT_SHA="${latestCommit.sha}"`,
+                    `export COMMIT_MESSAGE="${(latestCommit.commit?.message || '').replace(/"/g, '\\"')}"`,
+                    `export COMMIT_AUTHOR="${latestCommit.commit?.author?.name || ''}"`,
+                    `export COMMIT_DATE="${latestCommit.commit?.author?.date || new Date().toISOString()}"`,
+                    `export TRIGGER_TYPE="${isManualTrigger ? 'manual' : 'auto'}"`
+                ].join('\n');
+
+                const fullScriptContent = `#!/bin/bash\n\n# Set environment variables\n${envVars}\n\n# Main script\n${action.scriptContent}`;
+                const scriptPath = `/tmp/action_${action.id}_${Date.now()}.sh`;
+
+                try {
+                    await fs.writeFile(scriptPath, fullScriptContent);
+                    await fs.chmod(scriptPath, '755');
+
+                    const { stdout, stderr } = await exec(scriptPath);
+                    console.log(`Script output for action ${action.id} on branch ${branchName}:`, stdout);
+                    if (stderr) console.error(`Script error for action ${action.id} on branch ${branchName}:`, stderr);
+                } finally {
+                    await fs.unlink(scriptPath).catch(console.error);
+                }
+            }
+
+            // Log execution with appropriate status
+            await this.db.checkLog.create({
+                data: {
+                    projectId: project.id,
+                    branchName: branchName,
+                    status: isManualTrigger ? 'manual_trigger' : 'changed',
+                    commitSha: latestCommit.sha,
+                    commitMessage: latestCommit.commit?.message || '',
+                    commitDate: latestCommit.commit?.author?.date || new Date().toISOString(),
+                    commitAuthor: latestCommit.commit?.author?.name || '',
+                }
+            });
+
+        } catch (error) {
+            console.error(`Error executing action ${action.id}:`, error);
+            // Log error with appropriate status
+            await this.db.checkLog.create({
+                data: {
+                    projectId: project.id,
+                    branchName: branchName,
+                    status: `error: ${error.message} (${isManualTrigger ? 'manual trigger' : 'auto check'})`,
+                    commitDate: new Date().toISOString(),
+                    commitAuthor: 'System',
+                }
+            });
+            throw error;
+        }
+    }
+
     async initializeProjectTimers() {
         try {
             const projects = await this.db.project.findMany();

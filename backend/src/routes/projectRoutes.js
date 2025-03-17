@@ -56,6 +56,39 @@ function setupProjectRoutes(projectController) {
      */
     router.get('/:projectId/logs', projectController.getProjectLogs.bind(projectController));
 
+    /**
+     * @swagger
+     * /projects/{projectId}/trigger:
+     *   post:
+     *     summary: Trigger project actions for a specific branch
+     *     tags: [Projects]
+     *     parameters:
+     *       - in: path
+     *         name: projectId
+     *         required: true
+     *         schema:
+     *           type: string
+     *         description: Project ID
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               branch:
+     *                 type: string
+     *                 description: Branch name to trigger actions for
+     *     responses:
+     *       200:
+     *         description: Actions triggered successfully
+     *       404:
+     *         description: Project not found
+     *       500:
+     *         description: Server error
+     */
+    router.post('/:projectId/trigger', projectController.triggerActions.bind(projectController));
+
     return router;
 }
 

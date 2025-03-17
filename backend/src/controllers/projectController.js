@@ -239,6 +239,81 @@ class ProjectController {
             res.status(500).json({ error: err.message });
         }
     }
+
+    async triggerActions(req, res) {
+        const { projectId } = req.params;
+        const { branch } = req.body;
+
+        if (!branch) {
+            return res.status(400).json({ error: 'Branch name is required' });
+        }
+
+        try {
+            const project = await this.db.project.findUnique({
+                where: { id: parseInt(projectId) },
+                include: {
+                    branches: true,
+                    actions: true
+                }
+            });
+
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
+
+            // Verify the branch exists in the project
+            const branchExists = project.branches.some(b => b.branchName === branch);
+            if (!branchExists) {
+                return res.status(400).json({ error: 'Branch not found in project' });
+            }
+
+            // Execute all actions for the project
+            const results = await Promise.allSettled(project.actions.map(async (action) => {
+                try {
+                    // Pass isManualTrigger as true for manual action triggers
+                    await this.projectService.executeAction(project, action, branch, true);
+                    return { actionId: action.id, status: 'success' };
+                } catch (actionError) {
+                    console.error(`Error executing action ${action.id}:`, actionError);
+                    return {
+                        actionId: action.id,
+                        status: 'error',
+                        error: actionError.message
+                    };
+                }
+            }));
+
+            // Check if any actions succeeded
+            const successfulActions = results.filter(r => r.value?.status === 'success');
+            const failedActions = results.filter(r => r.value?.status === 'error');
+
+            if (successfulActions.length === 0 && failedActions.length > 0) {
+                // All actions failed
+                return res.status(500).json({
+                    error: 'All actions failed to execute',
+                    details: failedActions.map(r => ({
+                        actionId: r.value.actionId,
+                        error: r.value.error
+                    }))
+                });
+            }
+
+            // Some actions succeeded
+            res.json({
+                message: failedActions.length > 0 ? 'Some actions triggered successfully' : 'All actions triggered successfully',
+                results: {
+                    successful: successfulActions.map(r => r.value.actionId),
+                    failed: failedActions.map(r => ({
+                        actionId: r.value.actionId,
+                        error: r.value.error
+                    }))
+                }
+            });
+        } catch (err) {
+            console.error('Error triggering actions:', err);
+            res.status(500).json({ error: 'Failed to trigger actions' });
+        }
+    }
 }
 
 module.exports = ProjectController;

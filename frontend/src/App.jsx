@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Grid, Typography } from '@mui/material';
+import { Container, Grid, Typography, CircularProgress } from '@mui/material';
 import axios from 'axios';
 import './App.css';
 
@@ -41,7 +41,7 @@ function App() {
     name: '',
     actionType: 'webhook',
     webhookUrl: '',
-    scriptContent: '',
+    scriptContent: ''
   });
   const [secrets, setSecrets] = useState([]);
   const [newSecret, setNewSecret] = useState({ name: '', value: '' });
@@ -246,6 +246,36 @@ function App() {
     setLoadingLogs(false);
   };
 
+  const handleTriggerAction = async (projectId, branch) => {
+    try {
+      const response = await axiosInstance.post(`/projects/${projectId}/trigger`, { branch });
+      
+      // Handle different success scenarios
+      if (response.data.message) {
+        console.log(response.data.message);
+        console.log(response.data.results);
+
+        // Show detailed error messages for failed actions
+        response.data.results?.failed?.forEach(failure => {
+          console.error(`Action ${failure.actionId}: ${failure.error}`);
+        });
+      }
+    } catch (err) {
+      // Handle error responses
+      if (err.response?.data?.details) {
+        // Show the main error message
+        console.error(err.response.data.error);
+        
+        // Show individual action failures
+        err.response.data.details.forEach(detail => {
+          console.error(`Action ${detail.actionId}: ${detail.error}`);
+        });
+      } else {
+        console.error(err.response?.data?.error || 'Failed to trigger actions');
+      }
+    }
+  };
+
   return (
     <div className="App" style={{ 
       minHeight: '100vh', 
@@ -274,6 +304,7 @@ function App() {
                   onEditProject={handleOpenDialog}
                   onDeleteProject={handleDelete}
                   onDeleteAction={handleDeleteAction}
+                  onTriggerAction={handleTriggerAction}
                 />
               </Grid>
             ))}
