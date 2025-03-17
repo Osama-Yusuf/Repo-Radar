@@ -415,6 +415,103 @@ class ProjectController {
             res.status(500).json({ error: 'Failed to update action' });
         }
     }
+
+    async exportProjects(req, res) {
+        try {
+            const projects = await this.db.project.findMany({
+                include: {
+                    branches: true,
+                    actions: {
+                        include: {
+                            webhookParams: true
+                        }
+                    }
+                }
+            });
+
+            const exportData = projects.map(project => ({
+                name: project.name,
+                repo_url: project.repoUrl,
+                check_interval: project.checkInterval,
+                branches: project.branches.map(b => b.branchName),
+                actions: project.actions.map(action => ({
+                    name: action.name,
+                    actionType: action.actionType,
+                    webhookUrl: action.webhookUrl,
+                    scriptContent: action.scriptContent,
+                    webhookParams: action.webhookParams.map(param => ({
+                        branch: param.branch,
+                        name: param.name,
+                        value: param.value
+                    }))
+                }))
+            }));
+
+            res.json(exportData);
+        } catch (error) {
+            console.error('Error exporting projects:', error);
+            res.status(500).json({ error: 'Failed to export projects' });
+        }
+    }
+
+    async importProjects(req, res) {
+        const projects = req.body;
+
+        if (!Array.isArray(projects)) {
+            return res.status(400).json({ error: 'Input must be an array of projects' });
+        }
+
+        try {
+            const results = await Promise.allSettled(projects.map(async (projectData) => {
+                try {
+                    const project = await this.db.project.create({
+                        data: {
+                            name: projectData.name,
+                            repoUrl: projectData.repo_url,
+                            checkInterval: projectData.check_interval || 5,
+                            branches: {
+                                create: projectData.branches.map(branch => ({
+                                    branchName: branch
+                                }))
+                            },
+                            actions: {
+                                create: projectData.actions?.map(action => ({
+                                    name: action.name,
+                                    actionType: action.actionType,
+                                    webhookUrl: action.webhookUrl,
+                                    scriptContent: action.scriptContent,
+                                    webhookParams: {
+                                        create: action.webhookParams?.map(param => ({
+                                            branch: param.branch,
+                                            name: param.name,
+                                            value: param.value
+                                        }))
+                                    }
+                                })) || []
+                            }
+                        }
+                    });
+
+                    await this.projectService.setupProjectTimer(project);
+                    return { status: 'success', name: projectData.name };
+                } catch (err) {
+                    return { status: 'error', name: projectData.name, error: err.message };
+                }
+            }));
+
+            const successful = results.filter(r => r.value?.status === 'success');
+            const failed = results.filter(r => r.value?.status === 'error');
+
+            res.json({
+                message: `Imported ${successful.length} projects successfully${failed.length > 0 ? `, ${failed.length} failed` : ''}`,
+                successful: successful.map(r => r.value.name),
+                failed: failed.map(r => ({ name: r.value.name, error: r.value.error }))
+            });
+        } catch (error) {
+            console.error('Error importing projects:', error);
+            res.status(500).json({ error: 'Failed to import projects' });
+        }
+    }
 }
 
 module.exports = ProjectController;

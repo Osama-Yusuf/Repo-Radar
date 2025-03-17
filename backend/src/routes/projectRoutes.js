@@ -89,6 +89,24 @@ function setupProjectRoutes(projectController) {
      */
     router.post('/:projectId/trigger', projectController.triggerActions.bind(projectController));
 
+    /**
+     * @swagger
+     * /projects/export:
+     *   get:
+     *     summary: Export all projects configuration
+     *     tags: [Projects]
+     */
+    router.get('/export/all', projectController.exportProjects.bind(projectController));
+
+    /**
+     * @swagger
+     * /projects/import:
+     *   post:
+     *     summary: Import projects configuration
+     *     tags: [Projects]
+     */
+    router.post('/import', projectController.importProjects.bind(projectController));
+
     return router;
 }
 

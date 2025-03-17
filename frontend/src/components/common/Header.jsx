@@ -1,9 +1,50 @@
-import { AppBar, Toolbar, Typography, Box, IconButton, Button, CircularProgress, InputBase } from '@mui/material';
-import { GitHub as GitHubIcon, Refresh as RefreshIcon, Add as AddIcon, Search as SearchIcon } from '@mui/icons-material';
+import { useState } from 'react';
+import { AppBar, Toolbar, Typography, Box, IconButton, Button, InputBase, Tooltip } from '@mui/material';
+import { GitHub as GitHubIcon, Add as AddIcon, Search as SearchIcon, FileUpload as ImportIcon, FileDownload as ExportIcon } from '@mui/icons-material';
 import { useSearch } from '../../contexts/SearchContext';
+import axios from 'axios';
+
+const PORT = import.meta.env.VITE_PORT || '3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
   const { handleSearch } = useSearch();
+  const [importInput, setImportInput] = useState(null);
+
+  const handleExport = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/projects/export/all`);
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'repo-radar-projects.json';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error exporting projects:', error);
+    }
+  };
+
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const projects = JSON.parse(e.target.result);
+        await axios.post(`${API_BASE_URL}/projects/import`, projects);
+        onRefresh();
+      } catch (error) {
+        console.error('Error importing projects:', error);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = null; // Reset input
+  };
 
   return (
     <AppBar
@@ -48,7 +89,39 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
           />
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <input
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={handleImport}
+            ref={input => setImportInput(input)}
+          />
+          
+          <Tooltip title="Import Projects">
+            <IconButton
+              onClick={() => importInput?.click()}
+              sx={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                '&:hover': { color: '#fff' }
+              }}
+            >
+              <ExportIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Export Projects">
+            <IconButton
+              onClick={handleExport}
+              sx={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                '&:hover': { color: '#fff' }
+              }}
+            >
+              <ImportIcon />
+            </IconButton>
+          </Tooltip>
+
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -59,7 +132,7 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
               color: 'white',
               fontWeight: 600,
               '&:hover': {
-                background: 'linear-gradient(45deg, #1976d2 30%, #00a0c2 90%)',
+                background: 'linear-gradient(45deg, #1976d2 30%, #00a0c2 90%)'
               }
             }}
           >
