@@ -11,6 +11,7 @@ const ProjectController = require('./src/controllers/projectController');
 const ActionController = require('./src/controllers/actionController');
 const setupProjectRoutes = require('./src/routes/projectRoutes');
 const setupActionRoutes = require('./src/routes/actionRoutes');
+const k8sRoutes = require('./src/routes/k8s');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ async function initializeApp() {
         // API routes
         app.use('/api/projects', projectRouter);
         app.use('/api', actionRouter);
+        app.use('/api/k8s', k8sRoutes);
 
         // Swagger documentation
         app.use('/', swaggerUi.serve);

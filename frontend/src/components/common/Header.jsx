@@ -1,7 +1,10 @@
 import { AppBar, Toolbar, Typography, Box, IconButton, Button, CircularProgress, InputBase } from '@mui/material';
 import { GitHub as GitHubIcon, Refresh as RefreshIcon, Add as AddIcon, Search as SearchIcon } from '@mui/icons-material';
+import { useSearch } from '../../contexts/SearchContext';
 
-const Header = ({ onRefresh, onAddProject, isRefreshing, onSearch }) => {
+const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
+  const { handleSearch } = useSearch();
+
   return (
     <AppBar 
       position="static" 
@@ -41,7 +44,7 @@ const Header = ({ onRefresh, onAddProject, isRefreshing, onSearch }) => {
                 opacity: 1
               }
             }}
-            onChange={(e) => onSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
           />
         </Box>
 

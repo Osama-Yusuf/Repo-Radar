@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Container, Grid, Typography, CircularProgress, Box, Button } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
 // Components
 import Header from './components/common/Header';
+import SideNav from './components/layout/SideNav';
 import ProjectCard from './components/projects/ProjectCard';
 import ProjectDialog from './components/projects/ProjectDialog';
 import ActionDialog from './components/actions/ActionDialog';
 import LogsDialog from './components/logs/LogsDialog';
+
+// Pages
+import PodStatus from './pages/PodStatus';
+
+// Context
+import { SearchProvider, useSearch } from './contexts/SearchContext';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
@@ -18,6 +26,132 @@ console.log(`API_BASE_URL: ${API_BASE_URL}`);
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
+
+function RepositoriesPage({ 
+  projects,
+  loading,
+  error,
+  handleOpenLogs,
+  handleOpenActionDialog,
+  handleOpenDialog,
+  handleDelete,
+  handleDeleteAction,
+  handleTriggerAction,
+  sortConfig,
+  handleSort,
+  sortProjects
+}) {
+  const { searchQuery } = useSearch();
+
+  const filteredAndSortedProjects = sortProjects(
+    (projects || []).filter(project => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        (project?.name?.toLowerCase() || '').includes(query) ||
+        (project?.repo_url?.toLowerCase() || '').includes(query) ||
+        (Array.isArray(project?.branches) ? project.branches.join(', ').toLowerCase() : '').includes(query)
+      );
+    })
+  );
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        mb: 3 
+      }}>
+        <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
+          Monitored Repositories
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {[
+            { label: 'Name', field: 'name' },
+            { label: 'Branches', field: 'branches' },
+            { label: 'Actions', field: 'actions' },
+            { label: 'Last Updated', field: 'updated' }
+          ].map(({ label, field }) => (
+            <Button
+              key={field}
+              size="small"
+              onClick={() => handleSort(field)}
+              sx={{
+                color: sortConfig.field === field ? '#2196f3' : 'rgba(255, 255, 255, 0.7)',
+                minWidth: 'auto',
+                px: 2,
+                '&:hover': {
+                  color: '#2196f3'
+                }
+              }}
+              endIcon={sortConfig.field === field ? (
+                <Typography component="span" sx={{ fontSize: '0.8rem', ml: 0.5 }}>
+                  {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                </Typography>
+              ) : null}
+            >
+              {label}
+            </Button>
+          ))}
+        </Box>
+      </Box>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Typography color="error">{error}</Typography>
+      ) : (
+        <Grid container spacing={3}>
+          {filteredAndSortedProjects.length === 0 ? (
+            <Grid item xs={12} sx={{ textAlign: 'center', mt: 8 }}>
+              <Typography variant="h5" sx={{ color: '#8b8da0', mb: 2 }}>
+                {searchQuery ? 'No matching repositories found' : 'No repositories monitored yet'}
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#6b6d7c', mb: 4 }}>
+                {searchQuery ? 
+                  'Try adjusting your search query' : 
+                  'Click the "Add Project" button above to start monitoring your first repository'
+                }
+              </Typography>
+              {!searchQuery && (
+                <div style={{ 
+                  width: '60px',
+                  height: '60px',
+                  margin: '0 auto',
+                  border: '3px dashed #2d325a',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Typography variant="h4" sx={{ color: '#2d325a' }}>+</Typography>
+                </div>
+              )}
+            </Grid>
+          ) : (
+            filteredAndSortedProjects.map((project) => (
+              <Grid item xs={12} key={project.id}>
+                <ProjectCard
+                  project={project}
+                  onOpenLogs={handleOpenLogs}
+                  onOpenActionDialog={handleOpenActionDialog}
+                  onEditProject={handleOpenDialog}
+                  onDeleteProject={handleDelete}
+                  onDeleteAction={handleDeleteAction}
+                  onTriggerAction={handleTriggerAction}
+                />
+              </Grid>
+            ))
+          )}
+        </Grid>
+      )}
+    </Container>
+  );
+}
 
 function App() {
   // Project State
@@ -33,7 +167,6 @@ function App() {
     branches: '',
     checkInterval: 5,
   });
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ field: 'name', direction: 'asc' });
 
   // Action State
@@ -77,11 +210,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Search and Sort Functions
-  const handleSearch = (query) => {
-    setSearchQuery(query.toLowerCase());
-  };
-
+  // Sort Functions
   const handleSort = (field) => {
     setSortConfig(prev => ({
       field,
@@ -89,53 +218,30 @@ function App() {
     }));
   };
 
-  const filterProjects = (projects) => {
-    return projects.filter(project => {
-      const searchFields = [
-        project.name.toLowerCase(),
-        project.repo_url.toLowerCase(),
-        ...(project.branches || []).map(b => b.toLowerCase()),
-        ...(project.actions || []).map(a => [
-          a.name.toLowerCase(),
-          a.webhookUrl?.toLowerCase() || '',
-          a.scriptContent?.toLowerCase() || '',
-          ...(a.webhookParams || []).map(p => `${p.name}:${p.value}`.toLowerCase())
-        ]).flat()
-      ];
-      return searchFields.some(field => field.includes(searchQuery));
-    });
-  };
-
   const sortProjects = (projects) => {
+    if (!Array.isArray(projects)) return [];
+    
     return [...projects].sort((a, b) => {
-      let aValue, bValue;
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
       
       switch (sortConfig.field) {
         case 'name':
-          aValue = a.name;
-          bValue = b.name;
-          break;
+          return direction * ((a?.name || '').localeCompare(b?.name || ''));
         case 'branches':
-          aValue = (a.branches || []).length;
-          bValue = (b.branches || []).length;
-          break;
+          const aBranches = Array.isArray(a?.branches) ? a.branches.length : 0;
+          const bBranches = Array.isArray(b?.branches) ? b.branches.length : 0;
+          return direction * (aBranches - bBranches);
         case 'actions':
-          aValue = (a.actions || []).length;
-          bValue = (b.actions || []).length;
-          break;
+          const aActions = Array.isArray(a?.actions) ? a.actions.length : 0;
+          const bActions = Array.isArray(b?.actions) ? b.actions.length : 0;
+          return direction * (aActions - bActions);
         case 'updated':
-          aValue = new Date(a.updated_at || 0).getTime();
-          bValue = new Date(b.updated_at || 0).getTime();
-          break;
+          const aDate = a?.updated_at ? new Date(a.updated_at) : new Date(0);
+          const bDate = b?.updated_at ? new Date(b.updated_at) : new Date(0);
+          return direction * (bDate - aDate);
         default:
-          aValue = a[sortConfig.field];
-          bValue = b[sortConfig.field];
+          return 0;
       }
-
-      if (sortConfig.direction === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      }
-      return aValue < bValue ? 1 : -1;
     });
   };
 
@@ -421,139 +527,82 @@ function App() {
   };
 
   return (
-    <div className="App" style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-      color: '#fff'
-    }}>
-      <Header 
-        onRefresh={() => fetchProjects(true)} 
-        onAddProject={() => handleOpenDialog()} 
-        isRefreshing={refreshing}
-        onSearch={handleSearch}
-      />
-
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3 
+    <SearchProvider>
+      <Router>
+        <div className="App" style={{ 
+          minHeight: '100vh', 
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+          color: '#fff',
+          display: 'flex'
         }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
-            Monitored Repositories
-          </Typography>
-          
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {[
-              { label: 'Name', field: 'name' },
-              { label: 'Branches', field: 'branches' },
-              { label: 'Actions', field: 'actions' },
-              { label: 'Last Updated', field: 'updated' }
-            ].map(({ label, field }) => (
-              <Button
-                key={field}
-                size="small"
-                onClick={() => handleSort(field)}
-                sx={{
-                  color: sortConfig.field === field ? '#2196f3' : 'rgba(255, 255, 255, 0.7)',
-                  minWidth: 'auto',
-                  px: 2,
-                  '&:hover': {
-                    color: '#2196f3'
-                  }
-                }}
-                endIcon={sortConfig.field === field ? (
-                  <Typography component="span" sx={{ fontSize: '0.8rem', ml: 0.5 }}>
-                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                  </Typography>
-                ) : null}
-              >
-                {label}
-              </Button>
-            ))}
-          </Box>
-        </Box>
+          <SideNav />
+          <Box sx={{ flex: 1, ml: '80px' }}>
+            <Header 
+              onRefresh={() => fetchProjects(true)} 
+              onAddProject={() => handleOpenDialog()} 
+              isRefreshing={refreshing}
+            />
 
-        {loading ? (
-          <Typography>Loading projects...</Typography>
-        ) : error ? (
-          <Typography color="error">{error}</Typography>
-        ) : (
-          <Grid container spacing={3}>
-            {projects.length === 0 ? (
-              <Grid item xs={12} sx={{ textAlign: 'center', mt: 8 }}>
-                <Typography variant="h5" sx={{ color: '#8b8da0', mb: 2 }}>
-                  No repositories monitored yet
-                </Typography>
-                <Typography variant="body1" sx={{ color: '#6b6d7c', mb: 4 }}>
-                  Click the "Add Project" button above to start monitoring your first repository
-                </Typography>
-                <div style={{ 
-                  width: '60px',
-                  height: '60px',
-                  margin: '0 auto',
-                  border: '3px dashed #2d325a',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Typography variant="h4" sx={{ color: '#2d325a' }}>+</Typography>
-                </div>
-              </Grid>
-            ) : (
-              sortProjects(filterProjects(projects)).map((project) => (
-                <Grid item xs={12} key={project.id}>
-                  <ProjectCard
-                    project={project}
-                    onOpenLogs={handleOpenLogs}
-                    onOpenActionDialog={handleOpenActionDialog}
-                    onEditProject={handleOpenDialog}
-                    onDeleteProject={handleDelete}
-                    onDeleteAction={handleDeleteAction}
-                    onTriggerAction={handleTriggerAction}
+            <Routes>
+              <Route 
+                path="/" 
+                element={
+                  <RepositoriesPage 
+                    projects={projects}
+                    loading={loading}
+                    error={error}
+                    handleOpenLogs={handleOpenLogs}
+                    handleOpenActionDialog={handleOpenActionDialog}
+                    handleOpenDialog={handleOpenDialog}
+                    handleDelete={handleDelete}
+                    handleDeleteAction={handleDeleteAction}
+                    handleTriggerAction={handleTriggerAction}
+                    sortConfig={sortConfig}
+                    handleSort={handleSort}
+                    sortProjects={sortProjects}
                   />
-                </Grid>
-              ))
-            )}
-          </Grid>
-        )}
-      </Container>
+                } 
+              />
+              <Route path="/pods" element={<PodStatus />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
 
-      <ProjectDialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        formData={formData}
-        setFormData={setFormData}
-        onSubmit={handleSubmit}
-        editingProject={editingProject}
-      />
+            <ProjectDialog
+              open={openDialog}
+              onClose={handleCloseDialog}
+              formData={formData}
+              setFormData={setFormData}
+              onSubmit={handleSubmit}
+              editingProject={editingProject}
+            />
 
-      <ActionDialog
-        open={openActionDialog}
-        onClose={handleCloseActionDialog}
-        selectedProject={selectedProject}
-        editingAction={editingAction}
-        actionFormData={actionFormData}
-        setActionFormData={setActionFormData}
-        onSaveAction={handleSaveAction}
-        onDeleteAction={handleDeleteAction}
-        secrets={secrets}
-        newSecret={newSecret}
-        setNewSecret={setNewSecret}
-        onAddSecret={handleAddSecret}
-        onDeleteSecret={handleDeleteSecret}
-      />
+            <ActionDialog
+              open={openActionDialog}
+              onClose={handleCloseActionDialog}
+              selectedProject={selectedProject}
+              editingAction={editingAction}
+              actionFormData={actionFormData}
+              setActionFormData={setActionFormData}
+              onSaveAction={handleSaveAction}
+              onDeleteAction={handleDeleteAction}
+              secrets={secrets}
+              newSecret={newSecret}
+              setNewSecret={setNewSecret}
+              onAddSecret={handleAddSecret}
+              onDeleteSecret={handleDeleteSecret}
+            />
 
-      <LogsDialog
-        open={openLogsDialog}
-        onClose={() => setOpenLogsDialog(false)}
-        selectedProject={selectedProject}
-        loadingLogs={loadingLogs}
-        projectLogs={projectLogs}
-      />
-    </div>
+            <LogsDialog
+              open={openLogsDialog}
+              onClose={() => setOpenLogsDialog(false)}
+              selectedProject={selectedProject}
+              loadingLogs={loadingLogs}
+              projectLogs={projectLogs}
+            />
+          </Box>
+        </div>
+      </Router>
+    </SearchProvider>
   );
 }
 
