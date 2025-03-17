@@ -1,15 +1,16 @@
 import { Box, List, ListItem, ListItemIcon, ListItemText, Paper, Tooltip } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  GitHub as GitHubIcon,
+  Source as SourceIcon,
   Memory as MemoryIcon,
-  Timeline as TimelineIcon,
+  Refresh as RefreshIcon,
+  AutoMode as AutoModeIcon
 } from '@mui/icons-material';
 
 const navItems = [
-  { path: '/', label: 'Repositories', icon: <GitHubIcon /> },
+  { path: '/', label: 'Repositories', icon: <SourceIcon /> },
   { path: '/pods', label: 'Pod Status', icon: <MemoryIcon /> },
-  { path: '/pipeline-status', label: 'Pipeline Status', icon: <TimelineIcon /> },
+  { path: '/pipeline-status', label: 'Pipeline Status', icon: <AutoModeIcon /> },
 ];
 
 const SideNav = () => {
