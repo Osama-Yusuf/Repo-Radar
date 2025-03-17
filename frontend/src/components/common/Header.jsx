@@ -6,9 +6,9 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
   const { handleSearch } = useSearch();
 
   return (
-    <AppBar 
-      position="static" 
-      sx={{ 
+    <AppBar
+      position="static"
+      sx={{
         background: 'rgba(255, 255, 255, 0.05)',
         backdropFilter: 'blur(10px)',
         boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
@@ -22,8 +22,8 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
             Repo Radar
           </Typography>
         </Box>
-        
-        <Box sx={{ 
+
+        <Box sx={{
           display: 'flex',
           alignItems: 'center',
           background: 'rgba(255, 255, 255, 0.1)',
@@ -49,30 +49,6 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton
-            sx={{ 
-              mr: 2,
-              color: '#fff',
-              '&:hover': {
-                background: 'rgba(255, 255, 255, 0.1)'
-              },
-              position: 'relative'
-            }}
-            onClick={onRefresh}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <CircularProgress
-                size={24}
-                sx={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  position: 'absolute'
-                }}
-              />
-            ) : (
-              <RefreshIcon />
-            )}
-          </IconButton>
           <Button
             variant="contained"
             startIcon={<AddIcon />}

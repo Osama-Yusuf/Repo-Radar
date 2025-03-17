@@ -22,6 +22,7 @@ import {
   Pending as PendingIcon,
   Refresh as RefreshIcon,
   RestartAlt as RestartIcon,
+  GitHub as GitHubIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
@@ -172,11 +173,6 @@ const PodStatus = () => {
         <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
           Pod Status
         </Typography>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchPods} sx={{ color: '#fff' }}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
       </Box>
 
       <Grid container spacing={3}>
@@ -330,6 +326,56 @@ const PodStatus = () => {
                       {pod.age}
                     </Typography>
                   </Grid>
+                  {pod.image && (() => {
+                    const match = pod.image.match(/:([a-f0-9]{7})--/);
+                    if (match) {
+                      return (
+                        <Grid item xs={12} sx={{ mt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', pt: 2 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            <Tooltip title="Latest deployed commit hash" placement="top" arrow>
+                              <Box
+                                component="span"
+                                sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  px: 1.5,
+                                  py: 0.75,
+                                  borderRadius: '6px',
+                                  backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                  border: '1px solid rgba(33, 150, 243, 0.2)',
+                                  color: '#2196f3',
+                                  fontSize: '0.85rem',
+                                  fontFamily: 'monospace',
+                                  letterSpacing: '0.5px',
+                                  fontWeight: 500,
+                                  cursor: 'default',
+                                  transition: 'all 0.2s ease-in-out',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(33, 150, 243, 0.15)',
+                                    borderColor: 'rgba(33, 150, 243, 0.3)',
+                                    transform: 'translateY(-1px)'
+                                  }
+                                }}
+                              >
+                                <GitHubIcon sx={{ fontSize: '1rem', mr: 0.5, opacity: 0.7 }} />
+                                <Typography component="span" sx={{ opacity: 0.7, mr: 0.5, fontSize: '0.8rem' }}>
+                                  commit
+                                </Typography>
+                                {match[1]}
+                              </Box>
+                            </Tooltip>
+                          </Box>
+                        </Grid>
+                      );
+                    }
+                    return null;
+                  })()}
                 </Grid>
               </Paper>
             </Grid>

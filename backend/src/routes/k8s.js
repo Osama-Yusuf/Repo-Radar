@@ -27,12 +27,16 @@ router.get('/pods', async (req, res) => {
       const ready = `${containerStatuses.filter(c => c.ready).length}/${containerStatuses.length}`;
       const restarts = containerStatuses.reduce((sum, c) => sum + (c.restartCount || 0), 0);
 
+      // Get the first container's image
+      const image = pod.spec.containers[0]?.image || '';
+
       return {
         name: pod.metadata.name,
         status: pod.status.phase,
         ready: ready,
         restarts: restarts,
         age: formatAge(pod.metadata.creationTimestamp),
+        image: image,
         containerStatuses: containerStatuses.map(status => ({
           name: status.name,
           ready: status.ready,
