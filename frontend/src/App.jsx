@@ -1,81 +1,30 @@
 import { useState, useEffect } from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Container,
-  Card,
-  CardContent,
-  Grid,
-  Button,
-  Box,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  IconButton,
-  Link,
-  CircularProgress,
-  Divider,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-} from '@mui/material';
-import {
-  Timeline,
-  TimelineItem,
-  TimelineOppositeContent,
-  TimelineSeparator,
-  TimelineDot,
-  TimelineConnector,
-  TimelineContent,
-} from '@mui/lab';
-import {
-  GitHub as GitHubIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  Commit as CommitIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Code as CodeIcon,
-  Settings as SettingsIcon,
-  Webhook as WebhookIcon,
-  Terminal as TerminalIcon,
-} from '@mui/icons-material';
+import { Container, Grid, Typography } from '@mui/material';
 import axios from 'axios';
 import './App.css';
+
+// Components
+import Header from './components/common/Header';
+import ProjectCard from './components/projects/ProjectCard';
+import ProjectDialog from './components/projects/ProjectDialog';
+import ActionDialog from './components/actions/ActionDialog';
+import LogsDialog from './components/logs/LogsDialog';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 console.log(`API_BASE_URL: ${API_BASE_URL}`);
 
-// Create an instance of Axios with a custom agent
-// Create an instance of Axios without https.Agent (for browser compatibility)
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
 
 function App() {
+  // Project State
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openLogsDialog, setOpenLogsDialog] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [projectLogs, setProjectLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -84,16 +33,23 @@ function App() {
     checkInterval: 5,
   });
 
+  // Action State
   const [openActionDialog, setOpenActionDialog] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
   const [editingAction, setEditingAction] = useState(null);
   const [actionFormData, setActionFormData] = useState({
     name: '',
-    actionType: 'webhook', // 'webhook' or 'script'
+    actionType: 'webhook',
     webhookUrl: '',
     scriptContent: '',
   });
   const [secrets, setSecrets] = useState([]);
   const [newSecret, setNewSecret] = useState({ name: '', value: '' });
+
+  // Logs State
+  const [openLogsDialog, setOpenLogsDialog] = useState(false);
+  const [projectLogs, setProjectLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const fetchProjects = async () => {
     try {
@@ -112,6 +68,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Project Handlers
   const handleOpenDialog = (project = null) => {
     if (project) {
       setFormData({
@@ -169,6 +126,113 @@ function App() {
     }
   };
 
+  // Action Handlers
+  const handleOpenActionDialog = (project, action = null) => {
+    setSelectedProject(project);
+    if (action) {
+      setEditingAction(action);
+      setActionFormData({
+        name: action.name || '',
+        actionType: action.actionType,
+        webhookUrl: action.webhookUrl || '',
+        scriptContent: action.scriptContent || ''
+      });
+      loadSecrets(action.id);
+    } else {
+      setEditingAction(null);
+      setActionFormData({
+        name: '',
+        actionType: 'webhook',
+        webhookUrl: '',
+        scriptContent: ''
+      });
+      setSecrets([]);
+    }
+    setOpenActionDialog(true);
+  };
+
+  const handleCloseActionDialog = () => {
+    setOpenActionDialog(false);
+    setEditingAction(null);
+    setSelectedProject(null);
+    setActionFormData({
+      name: '',
+      actionType: 'webhook',
+      webhookUrl: '',
+      scriptContent: ''
+    });
+    setSecrets([]);
+    setNewSecret({ name: '', value: '' });
+  };
+
+  const handleSaveAction = async () => {
+    try {
+      const actionData = {
+        name: actionFormData.name,
+        actionType: actionFormData.actionType,
+        webhookUrl: actionFormData.webhookUrl || null,
+        scriptContent: actionFormData.scriptContent || null,
+      };
+
+      if (editingAction) {
+        await axiosInstance.put(`/projects/${selectedProject.id}/actions/${editingAction.id}`, actionData);
+      } else {
+        await axiosInstance.post(`/projects/${selectedProject.id}/actions`, actionData);
+      }
+
+      await fetchProjects();
+      handleCloseActionDialog();
+    } catch (err) {
+      console.error('Error saving action:', err);
+      setError(err.response?.data?.error || err.message);
+    }
+  };
+
+  const handleDeleteAction = async (actionId, projectId, e) => {
+    e.stopPropagation();
+    try {
+      await axiosInstance.delete(`/projects/${projectId}/actions/${actionId}`);
+      await fetchProjects();
+      if (selectedProject) {
+        const updatedProject = await axiosInstance.get(`/projects/${projectId}`);
+        setSelectedProject(updatedProject.data);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Secrets Handlers
+  const loadSecrets = async (actionId) => {
+    if (!actionId) return;
+    try {
+      const response = await axiosInstance.get(`/actions/${actionId}/secrets`);
+      setSecrets(response.data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleAddSecret = async () => {
+    try {
+      await axiosInstance.post(`/actions/${editingAction.id}/secrets`, newSecret);
+      setNewSecret({ name: '', value: '' });
+      loadSecrets(editingAction.id);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteSecret = async (secretId) => {
+    try {
+      await axiosInstance.delete(`/actions/${editingAction.id}/secrets/${secretId}`);
+      loadSecrets(editingAction.id);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Logs Handlers
   const handleOpenLogs = async (project) => {
     setSelectedProject(project);
     setOpenLogsDialog(true);
@@ -182,161 +246,16 @@ function App() {
     setLoadingLogs(false);
   };
 
-  const getStatusColor = (status) => {
-    if (status === 'changed') return '#4caf50'
-    if (status === 'no_change') return '#9e9e9e'
-    if (status?.startsWith('error')) return '#f44336'
-    return '#2196f3'
-  }
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString()
-  }
-
-  const handleOpenActionDialog = (project, action = null) => {
-    setSelectedProject(project)
-    if (action) {
-      setEditingAction(action)
-      setActionFormData({
-        name: action.name || '',
-        actionType: action.actionType,
-        webhookUrl: action.webhookUrl || '',
-        scriptContent: action.scriptContent || ''
-      })
-      loadSecrets(action.id)
-    } else {
-      setEditingAction(null)
-      setActionFormData({
-        name: '',
-        actionType: 'webhook',
-        webhookUrl: '',
-        scriptContent: ''
-      })
-      setSecrets([])
-    }
-    setOpenActionDialog(true)
-  }
-
-  const handleCloseActionDialog = () => {
-    setOpenActionDialog(false)
-    setEditingAction(null)
-    setSelectedProject(null)
-    setActionFormData({
-      name: '',
-      actionType: 'webhook',
-      webhookUrl: '',
-      scriptContent: ''
-    })
-    setSecrets([])
-    setNewSecret({ name: '', value: '' })
-  }
-
-  const handleSaveAction = async () => {
-    try {
-      const actionData = {
-        name: actionFormData.name,
-        actionType: actionFormData.actionType,
-        webhookUrl: actionFormData.webhookUrl || null,
-        scriptContent: actionFormData.scriptContent || null,
-      };
-  
-      if (editingAction) {
-        await axiosInstance.put(`/projects/${selectedProject.id}/actions/${editingAction.id}`, actionData);
-      } else {
-        await axiosInstance.post(`/projects/${selectedProject.id}/actions`, actionData);
-      }
-  
-      await fetchProjects();
-      handleCloseActionDialog();
-    } catch (err) {
-      console.error('Error saving action:', err);
-      setError(err.response?.data?.error || err.message);
-    }
-  };
-  
-  const handleDeleteAction = async (actionId, projectId, e) => {
-    e.stopPropagation();
-    try {
-      await axiosInstance.delete(`/projects/${projectId}/actions/${actionId}`);
-      await fetchProjects(); // Fetch all projects
-      // Update the selected project in the dialog
-      if (selectedProject) {
-        const updatedProject = await axiosInstance.get(`/projects/${projectId}`);
-        setSelectedProject(updatedProject.data);
-      }
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-  
-  const loadSecrets = async (actionId) => {
-    if (!actionId) return;
-    try {
-      const response = await axiosInstance.get(`/actions/${actionId}/secrets`);
-      setSecrets(response.data);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-  
-  const handleAddSecret = async () => {
-    try {
-      await axiosInstance.post(`/actions/${editingAction.id}/secrets`, newSecret);
-      setNewSecret({ name: '', value: '' });
-      loadSecrets(editingAction.id);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-  
-  const handleDeleteSecret = async (secretId) => {
-    try {
-      await axiosInstance.delete(`/actions/${editingAction.id}/secrets/${secretId}`);
-      loadSecrets(editingAction.id);
-    } catch (err) {
-      setError(err.message);
-    }
-  };  
-
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-      <AppBar position="static" sx={{ bgcolor: '#2196f3' }}>
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <GitHubIcon sx={{ fontSize: 32, mr: 2 }} />
-            <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              Repo Radar
-            </Typography>
-          </Box>
-          <Box>
-            <IconButton
-              color="inherit"
-              onClick={fetchProjects}
-              sx={{ mr: 1 }}
-            >
-              <RefreshIcon />
-            </IconButton>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              sx={{
-                bgcolor: 'white',
-                color: '#2196f3',
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.9)'
-                }
-              }}
-            >
-              Add Project
-            </Button>
-          </Box>
-        </Toolbar>
-      </AppBar>
+    <div className="App" style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      color: '#fff'
+    }}>
+      <Header onRefresh={fetchProjects} onAddProject={() => handleOpenDialog()} />
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Typography variant="h4" sx={{ mb: 3, fontWeight: 500 }}>
+        <Typography variant="h4" sx={{ mb: 3, fontWeight: 600, color: '#fff' }}>
           Monitored Repositories
         </Typography>
 
@@ -348,502 +267,54 @@ function App() {
           <Grid container spacing={3}>
             {projects.map((project) => (
               <Grid item xs={12} key={project.id}>
-                <Paper
-                  elevation={1}
-                  className="project-card"
-                  sx={{ p: 3 }}
-                  onClick={() => handleOpenLogs(project)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <GitHubIcon sx={{ fontSize: 24, mr: 2, color: '#666' }} />
-                      <Box sx={{ textAlign: 'left' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                          {project.name}
-                        </Typography>
-                        <Link
-                          href={project.repo_url}
-                          target="_blank"
-                          rel="noopener"
-                          className="repo-url"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {project.repo_url}
-                        </Link>
-                        <Box sx={{ mt: 1 }}>
-                          {project.branches && (
-                            <Chip
-                              label={`Branches: ${project.branches.join(', ')}`}
-                              size="small"
-                              className="interval-chip"
-                            />
-                          )}
-                          <Chip
-                            label={`Check interval: ${project.check_interval}min`}
-                            size="small"
-                            className="interval-chip"
-                          />
-                        </Box>
-
-                        {/* Actions Section */}
-                        {project.actions && project.actions.length > 0 && (
-                          <Box sx={{ mt: 2 }}>
-                            <Divider sx={{ my: 1 }} />
-                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                              Actions
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                              {project.actions.map((action) => (
-                                <Chip
-                                  key={action.id}
-                                  label={action.name || 'Unnamed Action'}
-                                  size="small"
-                                  icon={action.actionType === 'webhook' ? <WebhookIcon /> : <TerminalIcon />}
-                                  onDelete={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteAction(action.id, project.id, e);
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleOpenActionDialog(project, action)
-                                  }}
-                                  sx={{
-                                    '& .MuiChip-icon': {
-                                      color: action.actionType === 'webhook' ? '#2196f3' : '#4caf50'
-                                    }
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                    <Box className="action-buttons">
-                      <IconButton
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenActionDialog(project)
-                        }}
-                        sx={{ mr: 1 }}
-                      >
-                        <SettingsIcon />
-                      </IconButton>
-                      <IconButton
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenDialog(project)
-                        }}
-                        sx={{ mr: 1 }}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(project.id)
-                        }}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                </Paper>
+                <ProjectCard
+                  project={project}
+                  onOpenLogs={handleOpenLogs}
+                  onOpenActionDialog={handleOpenActionDialog}
+                  onEditProject={handleOpenDialog}
+                  onDeleteProject={handleDelete}
+                  onDeleteAction={handleDeleteAction}
+                />
               </Grid>
             ))}
           </Grid>
         )}
       </Container>
 
-      <Dialog
+      <ProjectDialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 2 }
-        }}
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 500 }}>
-            {editingProject ? 'Edit Project' : 'Add New Project'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Project Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Repository URL"
-              value={formData.repoUrl}
-              onChange={(e) => setFormData({ ...formData, repoUrl: e.target.value })}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Branches (comma-separated)"
-              value={formData.branches}
-              onChange={(e) => setFormData({ ...formData, branches: e.target.value })}
-              margin="normal"
-              placeholder="main,develop,feature/*"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Check Interval (minutes)"
-              type="number"
-              value={formData.checkInterval}
-              onChange={(e) => setFormData({ ...formData, checkInterval: e.target.value })}
-              margin="normal"
-              inputProps={{ min: 1 }}
-              variant="outlined"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button
-            onClick={handleCloseDialog}
-            sx={{ mr: 1 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disableElevation
-          >
-            {editingProject ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        formData={formData}
+        setFormData={setFormData}
+        onSubmit={handleSubmit}
+        editingProject={editingProject}
+      />
 
-      <Dialog
-        open={openLogsDialog}
-        onClose={() => setOpenLogsDialog(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            minHeight: '70vh'
-          }
-        }}
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              {selectedProject?.name} - Activity Log
-            </Typography>
-            <IconButton onClick={() => setOpenLogsDialog(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {loadingLogs ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Box sx={{ py: 2 }}>
-              <Timeline position="right">
-                {projectLogs.map((log) => (
-                  <TimelineItem key={log.id}>
-                    <TimelineOppositeContent sx={{ flex: 0.2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDate(log.checked_at)}
-                      </Typography>
-                    </TimelineOppositeContent>
-                    <TimelineSeparator>
-                      <TimelineDot sx={{ bgcolor: getStatusColor(log.status) }}>
-                        {log.status === 'changed' ? (
-                          <CommitIcon />
-                        ) : log.status === 'no_change' ? (
-                          <CheckCircleIcon />
-                        ) : (
-                          <ErrorIcon />
-                        )}
-                      </TimelineDot>
-                      <TimelineConnector />
-                    </TimelineSeparator>
-                    <TimelineContent>
-                      <Paper
-                        elevation={1}
-                        sx={{
-                          p: 2,
-                          bgcolor: 'background.paper',
-                          mb: 2
-                        }}
-                      >
-                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                          Branch: {log.branch_name}
-                        </Typography>
-                        {log.status === 'changed' ? (
-                          <>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                              New commit: {log.commit_sha?.substring(0, 7)}
-                            </Typography>
-                            <Typography variant="body1" sx={{ mt: 1 }}>
-                              {log.commit_message}
-                            </Typography>
-                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="body2" color="text.secondary">
-                                by {log.commit_author}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                • {formatDate(log.commit_date)}
-                              </Typography>
-                            </Box>
-                          </>
-                        ) : log.status === 'no_change' ? (
-                          <Typography variant="body2" color="text.secondary">
-                            No changes detected
-                          </Typography>
-                        ) : (
-                          <Typography variant="body2" color="error">
-                            {log.status}
-                          </Typography>
-                        )}
-                      </Paper>
-                    </TimelineContent>
-                  </TimelineItem>
-                ))}
-              </Timeline>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Action Dialog */}
-      <Dialog
+      <ActionDialog
         open={openActionDialog}
         onClose={handleCloseActionDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 2 }
-        }}
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              {editingAction ? 'Edit Action' : 'Manage Actions'}
-            </Typography>
-            <IconButton onClick={handleCloseActionDialog}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={3}>
-            {/* Existing Actions */}
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Current Actions
-              </Typography>
-              {selectedProject?.actions?.length > 0 ? (
-                <List>
-                  {selectedProject.actions.map((action) => (
-                    <Paper
-                      key={action.id}
-                      elevation={1}
-                      sx={{ mb: 2, overflow: 'hidden' }}
-                    >
-                      <ListItem
-                        secondaryAction={
-                          <IconButton
-                            edge="end"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteAction(action.id, selectedProject.id, e);
-                            }}
-                            size="small"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        }
-                        sx={{ bgcolor: 'background.paper' }}
-                      >
-                        <ListItemText
-                          primary={
-                            <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                              {action.name || 'Unnamed Action'}
-                            </Typography>
-                          }
-                          secondary={action.actionType === 'webhook' ? 'Webhook' : 'Script'}
-                        />
-                      </ListItem>
-                      <Divider />
-                      <Box sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                        {action.webhookUrl ? (
-                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                            {action.webhookUrl}
-                          </Typography>
-                        ) : (
-                          <>
-                            <Typography variant="body2" sx={{
-                              whiteSpace: 'pre-wrap',
-                              fontFamily: 'monospace',
-                              bgcolor: '#f8f8f8',
-                              p: 1,
-                              borderRadius: 1
-                            }}>
-                              {action.scriptContent}
-                            </Typography>
-                            {action.secrets && action.secrets.length > 0 && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                  Environment Variables:
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                  {action.secrets.map((secret) => (
-                                    <Chip
-                                      key={secret.id}
-                                      label={secret.name}
-                                      onDelete={() => handleDeleteSecret(secret.id)}
-                                    />
-                                  ))}
-                                </Box>
-                              </Box>
-                            )}
-                          </>
-                        )}
-                      </Box>
-                    </Paper>
-                  ))}
-                </List>
-              ) : (
-                <Typography color="text.secondary">
-                  No actions configured yet
-                </Typography>
-              )}
-            </Grid>
+        selectedProject={selectedProject}
+        editingAction={editingAction}
+        actionFormData={actionFormData}
+        setActionFormData={setActionFormData}
+        onSaveAction={handleSaveAction}
+        onDeleteAction={handleDeleteAction}
+        secrets={secrets}
+        newSecret={newSecret}
+        setNewSecret={setNewSecret}
+        onAddSecret={handleAddSecret}
+        onDeleteSecret={handleDeleteSecret}
+      />
 
-            {/* Add New Action */}
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                {editingAction ? 'Edit Action' : 'Add New Action'}
-              </Typography>
-              <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1 }}>
-                <TextField
-                  fullWidth
-                  label="Action Name"
-                  value={actionFormData.name}
-                  onChange={(e) => setActionFormData({ ...actionFormData, name: e.target.value })}
-                  margin="normal"
-                  variant="outlined"
-                />
-
-                <FormControl fullWidth margin="normal">
-                  <InputLabel>Action Type</InputLabel>
-                  <Select
-                    value={actionFormData.actionType}
-                    onChange={(e) => setActionFormData({
-                      ...actionFormData,
-                      actionType: e.target.value,
-                      webhookUrl: '',
-                      scriptContent: ''
-                    })}
-                    label="Action Type"
-                  >
-                    <MenuItem value="webhook">Webhook</MenuItem>
-                    <MenuItem value="script">Bash Script</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {actionFormData.actionType === 'webhook' ? (
-                  <TextField
-                    fullWidth
-                    label="Webhook URL"
-                    value={actionFormData.webhookUrl}
-                    onChange={(e) => setActionFormData({ ...actionFormData, webhookUrl: e.target.value })}
-                    margin="normal"
-                    variant="outlined"
-                  />
-                ) : (
-                  <TextField
-                    fullWidth
-                    label="Bash Script"
-                    value={actionFormData.scriptContent}
-                    onChange={(e) => setActionFormData({ ...actionFormData, scriptContent: e.target.value })}
-                    margin="normal"
-                    variant="outlined"
-                    multiline
-                    rows={4}
-                  />
-                )}
-
-                {/* Secrets Section */}
-                {actionFormData.actionType === 'script' && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
-                      Environment Variables
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                      <TextField
-                        label="Name"
-                        value={newSecret.name}
-                        onChange={(e) => setNewSecret({ ...newSecret, name: e.target.value })}
-                        size="small"
-                      />
-                      <TextField
-                        label="Value"
-                        value={newSecret.value}
-                        onChange={(e) => setNewSecret({ ...newSecret, value: e.target.value })}
-                        size="small"
-                      />
-                      <Button
-                        variant="contained"
-                        onClick={handleAddSecret}
-                        disabled={!newSecret.name || !newSecret.value}
-                      >
-                        Add
-                      </Button>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {secrets.map((secret) => (
-                        <Chip
-                          key={secret.id}
-                          label={secret.name}
-                          onDelete={() => handleDeleteSecret(secret.id)}
-                          size="small"
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-                )}
-
-                <DialogActions>
-                  <Button onClick={handleCloseActionDialog}>Cancel</Button>
-                  <Button
-                    onClick={handleSaveAction}
-                    variant="contained"
-                    disabled={
-                      !actionFormData.name ||
-                      (actionFormData.actionType === 'webhook' && !actionFormData.webhookUrl) ||
-                      (actionFormData.actionType === 'script' && !actionFormData.scriptContent)
-                    }
-                  >
-                    {editingAction ? 'Save Changes' : 'Add Action'}
-                  </Button>
-                </DialogActions>
-              </Box>
-            </Grid>
-          </Grid>
-        </DialogContent>
-      </Dialog>
-    </Box>
-  )
+      <LogsDialog
+        open={openLogsDialog}
+        onClose={() => setOpenLogsDialog(false)}
+        selectedProject={selectedProject}
+        loadingLogs={loadingLogs}
+        projectLogs={projectLogs}
+      />
+    </div>
+  );
 }
 
-export default App
+export default App;
