@@ -88,9 +88,9 @@ function App() {
   const [editingAction, setEditingAction] = useState(null);
   const [actionFormData, setActionFormData] = useState({
     name: '',
-    action_type: 'webhook', // 'webhook' or 'script'
-    webhook_url: '',
-    script_content: '',
+    actionType: 'webhook', // 'webhook' or 'script'
+    webhookUrl: '',
+    scriptContent: '',
   });
   const [secrets, setSecrets] = useState([]);
   const [newSecret, setNewSecret] = useState({ name: '', value: '' });
@@ -199,18 +199,18 @@ function App() {
       setEditingAction(action)
       setActionFormData({
         name: action.name || '',
-        action_type: action.action_type,
-        webhook_url: action.webhook_url || '',
-        script_content: action.script_content || ''
+        actionType: action.actionType,
+        webhookUrl: action.webhookUrl || '',
+        scriptContent: action.scriptContent || ''
       })
       loadSecrets(action.id)
     } else {
       setEditingAction(null)
       setActionFormData({
         name: '',
-        action_type: 'webhook',
-        webhook_url: '',
-        script_content: ''
+        actionType: 'webhook',
+        webhookUrl: '',
+        scriptContent: ''
       })
       setSecrets([])
     }
@@ -223,9 +223,9 @@ function App() {
     setSelectedProject(null)
     setActionFormData({
       name: '',
-      action_type: 'webhook',
-      webhook_url: '',
-      script_content: ''
+      actionType: 'webhook',
+      webhookUrl: '',
+      scriptContent: ''
     })
     setSecrets([])
     setNewSecret({ name: '', value: '' })
@@ -235,9 +235,9 @@ function App() {
     try {
       const actionData = {
         name: actionFormData.name,
-        actionType: actionFormData.action_type,
-        webhookUrl: actionFormData.webhook_url || null,
-        scriptContent: actionFormData.script_content || null,
+        actionType: actionFormData.actionType,
+        webhookUrl: actionFormData.webhookUrl || null,
+        scriptContent: actionFormData.scriptContent || null,
       };
   
       if (editingAction) {
@@ -398,7 +398,7 @@ function App() {
                                   key={action.id}
                                   label={action.name || 'Unnamed Action'}
                                   size="small"
-                                  icon={action.action_type === 'webhook' ? <WebhookIcon /> : <TerminalIcon />}
+                                  icon={action.actionType === 'webhook' ? <WebhookIcon /> : <TerminalIcon />}
                                   onDelete={(e) => {
                                     e.stopPropagation();
                                     handleDeleteAction(action.id, project.id, e);
@@ -409,7 +409,7 @@ function App() {
                                   }}
                                   sx={{
                                     '& .MuiChip-icon': {
-                                      color: action.action_type === 'webhook' ? '#2196f3' : '#4caf50'
+                                      color: action.actionType === 'webhook' ? '#2196f3' : '#4caf50'
                                     }
                                   }}
                                 />
@@ -679,14 +679,14 @@ function App() {
                               {action.name || 'Unnamed Action'}
                             </Typography>
                           }
-                          secondary={action.action_type === 'webhook' ? 'Webhook' : 'Script'}
+                          secondary={action.actionType === 'webhook' ? 'Webhook' : 'Script'}
                         />
                       </ListItem>
                       <Divider />
                       <Box sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                        {action.webhook_url ? (
+                        {action.webhookUrl ? (
                           <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                            {action.webhook_url}
+                            {action.webhookUrl}
                           </Typography>
                         ) : (
                           <>
@@ -697,7 +697,7 @@ function App() {
                               p: 1,
                               borderRadius: 1
                             }}>
-                              {action.script_content}
+                              {action.scriptContent}
                             </Typography>
                             {action.secrets && action.secrets.length > 0 && (
                               <Box sx={{ mt: 2 }}>
@@ -746,12 +746,12 @@ function App() {
                 <FormControl fullWidth margin="normal">
                   <InputLabel>Action Type</InputLabel>
                   <Select
-                    value={actionFormData.action_type}
+                    value={actionFormData.actionType}
                     onChange={(e) => setActionFormData({
                       ...actionFormData,
-                      action_type: e.target.value,
-                      webhook_url: '',
-                      script_content: ''
+                      actionType: e.target.value,
+                      webhookUrl: '',
+                      scriptContent: ''
                     })}
                     label="Action Type"
                   >
@@ -760,12 +760,12 @@ function App() {
                   </Select>
                 </FormControl>
 
-                {actionFormData.action_type === 'webhook' ? (
+                {actionFormData.actionType === 'webhook' ? (
                   <TextField
                     fullWidth
                     label="Webhook URL"
-                    value={actionFormData.webhook_url}
-                    onChange={(e) => setActionFormData({ ...actionFormData, webhook_url: e.target.value })}
+                    value={actionFormData.webhookUrl}
+                    onChange={(e) => setActionFormData({ ...actionFormData, webhookUrl: e.target.value })}
                     margin="normal"
                     variant="outlined"
                   />
@@ -773,8 +773,8 @@ function App() {
                   <TextField
                     fullWidth
                     label="Bash Script"
-                    value={actionFormData.script_content}
-                    onChange={(e) => setActionFormData({ ...actionFormData, script_content: e.target.value })}
+                    value={actionFormData.scriptContent}
+                    onChange={(e) => setActionFormData({ ...actionFormData, scriptContent: e.target.value })}
                     margin="normal"
                     variant="outlined"
                     multiline
@@ -783,7 +783,7 @@ function App() {
                 )}
 
                 {/* Secrets Section */}
-                {actionFormData.action_type === 'script' && (
+                {actionFormData.actionType === 'script' && (
                   <Box sx={{ mt: 3 }}>
                     <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
                       Environment Variables
@@ -830,8 +830,8 @@ function App() {
                     variant="contained"
                     disabled={
                       !actionFormData.name ||
-                      (actionFormData.action_type === 'webhook' && !actionFormData.webhook_url) ||
-                      (actionFormData.action_type === 'script' && !actionFormData.script_content)
+                      (actionFormData.actionType === 'webhook' && !actionFormData.webhookUrl) ||
+                      (actionFormData.actionType === 'script' && !actionFormData.scriptContent)
                     }
                   >
                     {editingAction ? 'Save Changes' : 'Add Action'}

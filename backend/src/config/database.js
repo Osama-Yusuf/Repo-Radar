@@ -1,146 +1,71 @@
-const sqlite3 = require('sqlite3').verbose();
-const fs = require('fs').promises;
-
-const dbFile = './database.sqlite';
-
-// Promisify database operations
-function runAsync(db, sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function(err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
-
-function getAsync(db, sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
-
-function allAsync(db, sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-}
+const prisma = require('./prisma');
 
 async function initializeDatabase() {
     try {
-        await fs.access(dbFile);
-        console.log('Database file exists');
-    } catch {
-        console.log('Creating new database file');
-        await fs.writeFile(dbFile, '');
+        await prisma.$connect();
+        console.log('Connected to database via Prisma');
+        return prisma;
+    } catch (error) {
+        console.error('Error connecting to database:', error);
+        throw error;
     }
+}
 
-    return new Promise((resolve, reject) => {
-        const db = new sqlite3.Database(dbFile, async (err) => {
-            if (err) {
-                console.error('Error connecting to SQLite database:', err);
-                reject(err);
-                return;
-            }
-            console.log('Connected to SQLite database');
-            
-            try {
-                await createTables(db);
-                console.log('Database initialization completed successfully');
-                resolve(db);
-            } catch (error) {
-                console.error('Error during table creation:', error);
-                reject(error);
-            }
+const allAsync = async (db, query, params = []) => {
+    const model = query.toLowerCase().includes('from projects') ? 'project'
+        : query.toLowerCase().includes('from actions') ? 'action'
+            : query.toLowerCase().includes('from branches') ? 'branch'
+                : query.toLowerCase().includes('from check_logs') ? 'checkLog'
+                    : query.toLowerCase().includes('from secrets') ? 'secret'
+                        : null;
+
+    if (!model) throw new Error('Unsupported table in query');
+
+    return db[model].findMany();
+};
+
+const getAsync = async (db, query, params = []) => {
+    const model = query.toLowerCase().includes('from projects') ? 'project'
+        : query.toLowerCase().includes('from actions') ? 'action'
+            : query.toLowerCase().includes('from branches') ? 'branch'
+                : query.toLowerCase().includes('from check_logs') ? 'checkLog'
+                    : query.toLowerCase().includes('from secrets') ? 'secret'
+                        : null;
+
+    if (!model) throw new Error('Unsupported table in query');
+
+    return db[model].findFirst();
+};
+
+const runAsync = async (db, query, params = []) => {
+    const model = query.toLowerCase().includes('into projects') || query.toLowerCase().includes('update projects') ? 'project'
+        : query.toLowerCase().includes('into actions') || query.toLowerCase().includes('update actions') ? 'action'
+            : query.toLowerCase().includes('into branches') || query.toLowerCase().includes('update branches') ? 'branch'
+                : query.toLowerCase().includes('into check_logs') ? 'checkLog'
+                    : query.toLowerCase().includes('into secrets') || query.toLowerCase().includes('update secrets') ? 'secret'
+                        : null;
+
+    if (!model) throw new Error('Unsupported table in query');
+
+    if (query.toLowerCase().startsWith('insert')) {
+        return db[model].create({
+            data: params[0]
         });
-    });
-}
-
-async function createTables(db) {
-    try {
-        await runAsync(db, 'BEGIN TRANSACTION');
-
-        await runAsync(db, `
-            CREATE TABLE IF NOT EXISTS projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                repo_url TEXT NOT NULL,
-                check_interval INTEGER DEFAULT 5,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await runAsync(db, `
-            CREATE TABLE IF NOT EXISTS branches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER,
-                branch_name TEXT NOT NULL,
-                last_commit_sha TEXT,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
-                ON DELETE CASCADE
-            )
-        `);
-
-        await runAsync(db, `
-            CREATE TABLE IF NOT EXISTS check_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER,
-                branch_name TEXT NOT NULL,
-                commit_sha TEXT,
-                commit_message TEXT,
-                commit_author TEXT,
-                commit_date DATETIME,
-                checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                status TEXT,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
-                ON DELETE CASCADE
-            )
-        `);
-
-        await runAsync(db, `
-            CREATE TABLE IF NOT EXISTS actions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER,
-                name TEXT,
-                action_type TEXT NOT NULL,
-                webhook_url TEXT,
-                script_content TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (project_id) REFERENCES projects (id)
-                ON DELETE CASCADE
-            )
-        `);
-
-        await runAsync(db, `
-            CREATE TABLE IF NOT EXISTS secrets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                action_id INTEGER,
-                name TEXT NOT NULL,
-                value TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (action_id) REFERENCES actions (id)
-                ON DELETE CASCADE
-            )
-        `);
-
-        await runAsync(db, 'COMMIT');
-    } catch (err) {
-        await runAsync(db, 'ROLLBACK');
-        console.error('Error initializing database:', err);
-        throw err;
+    } else if (query.toLowerCase().startsWith('update')) {
+        return db[model].update({
+            where: { id: params[1] },
+            data: params[0]
+        });
+    } else if (query.toLowerCase().startsWith('delete')) {
+        return db[model].delete({
+            where: { id: params[0] }
+        });
     }
-}
+};
 
 module.exports = {
     initializeDatabase,
-    runAsync,
+    allAsync,
     getAsync,
-    allAsync
+    runAsync
 };

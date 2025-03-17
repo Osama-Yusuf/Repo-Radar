@@ -9,9 +9,12 @@ class ActionController {
         const { projectId } = req.params;
 
         try {
-            const actions = await allAsync(this.db, 'SELECT * FROM actions WHERE project_id = ?', [projectId]);
+            const actions = await this.db.action.findMany({
+                where: { projectId: parseInt(projectId) }
+            });
             res.json(actions);
         } catch (err) {
+            console.error('Error fetching project actions:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -25,20 +28,19 @@ class ActionController {
         }
 
         try {
-            const result = await runAsync(this.db,
-                'INSERT INTO actions (project_id, name, action_type, webhook_url, script_content) VALUES (?, ?, ?, ?, ?)',
-                [projectId, name || null, actionType, webhookUrl, scriptContent]
-            );
-
-            res.status(201).json({
-                id: result.lastID,
-                project_id: projectId,
-                name,
-                action_type: actionType,
-                webhook_url: webhookUrl,
-                script_content: scriptContent
+            const action = await this.db.action.create({
+                data: {
+                    projectId: parseInt(projectId),
+                    name: name || null,
+                    actionType,
+                    webhookUrl,
+                    scriptContent
+                }
             });
+
+            res.status(201).json(action);
         } catch (err) {
+            console.error('Error creating action:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -52,20 +54,27 @@ class ActionController {
         }
 
         try {
-            await runAsync(this.db,
-                `UPDATE actions 
-                SET name = ?, action_type = ?, webhook_url = ?, script_content = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ? AND project_id = ?`,
-                [name || null, actionType, webhookUrl, scriptContent, actionId, projectId]
-            );
+            const action = await this.db.action.update({
+                where: {
+                    id: parseInt(actionId),
+                    projectId: parseInt(projectId)
+                },
+                data: {
+                    name: name || null,
+                    actionType,
+                    webhookUrl,
+                    scriptContent,
+                    updatedAt: new Date()
+                }
+            });
 
-            const action = await getAsync(this.db, 'SELECT * FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
             if (!action) {
                 return res.status(404).json({ error: 'Action not found' });
             }
 
             res.json(action);
         } catch (err) {
+            console.error('Error updating action:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -74,14 +83,20 @@ class ActionController {
         const { projectId, actionId } = req.params;
 
         try {
-            const action = await getAsync(this.db, 'SELECT id FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
+            const action = await this.db.action.delete({
+                where: {
+                    id: parseInt(actionId),
+                    projectId: parseInt(projectId)
+                }
+            });
+
             if (!action) {
                 return res.status(404).json({ error: 'Action not found' });
             }
 
-            await runAsync(this.db, 'DELETE FROM actions WHERE id = ? AND project_id = ?', [actionId, projectId]);
             res.json({ message: 'Action deleted successfully' });
         } catch (err) {
+            console.error('Error deleting action:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -90,12 +105,17 @@ class ActionController {
         const { actionId } = req.params;
 
         try {
-            const secrets = await allAsync(this.db, 
-                'SELECT id, name, created_at FROM secrets WHERE action_id = ?', 
-                [actionId]
-            );
+            const secrets = await this.db.secret.findMany({
+                where: { actionId: parseInt(actionId) },
+                select: {
+                    id: true,
+                    name: true,
+                    createdAt: true
+                }
+            });
             res.json(secrets);
         } catch (err) {
+            console.error('Error fetching action secrets:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -109,30 +129,43 @@ class ActionController {
         }
 
         try {
-            const action = await getAsync(this.db, 'SELECT id FROM actions WHERE id = ?', [actionId]);
+            // Check if action exists
+            const action = await this.db.action.findUnique({
+                where: { id: parseInt(actionId) }
+            });
+
             if (!action) {
                 return res.status(404).json({ error: 'Action not found' });
             }
 
-            const existingSecret = await getAsync(this.db, 
-                'SELECT id FROM secrets WHERE action_id = ? AND name = ?', 
-                [actionId, name]
-            );
+            // Check for existing secret with same name
+            const existingSecret = await this.db.secret.findFirst({
+                where: {
+                    actionId: parseInt(actionId),
+                    name
+                }
+            });
+
             if (existingSecret) {
                 return res.status(409).json({ error: 'Secret with this name already exists' });
             }
 
-            const result = await runAsync(this.db,
-                'INSERT INTO secrets (action_id, name, value) VALUES (?, ?, ?)',
-                [actionId, name, value]
-            );
-
-            res.status(201).json({
-                id: result.lastID,
-                name,
-                created_at: new Date().toISOString()
+            const secret = await this.db.secret.create({
+                data: {
+                    actionId: parseInt(actionId),
+                    name,
+                    value
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    createdAt: true
+                }
             });
+
+            res.status(201).json(secret);
         } catch (err) {
+            console.error('Error creating secret:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -146,18 +179,21 @@ class ActionController {
         }
 
         try {
-            await runAsync(this.db,
-                'UPDATE secrets SET value = ? WHERE id = ? AND action_id = ?',
-                [value, secretId, actionId]
-            );
+            const secret = await this.db.secret.update({
+                where: {
+                    id: parseInt(secretId),
+                    actionId: parseInt(actionId)
+                },
+                data: { value }
+            });
 
-            const secret = await getAsync(this.db, 'SELECT id FROM secrets WHERE id = ? AND action_id = ?', [secretId, actionId]);
             if (!secret) {
                 return res.status(404).json({ error: 'Secret not found' });
             }
 
             res.json({ message: 'Secret updated successfully' });
         } catch (err) {
+            console.error('Error updating secret:', err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -166,18 +202,20 @@ class ActionController {
         const { actionId, secretId } = req.params;
 
         try {
-            const secret = await getAsync(this.db, 'SELECT id FROM secrets WHERE id = ? AND action_id = ?', [secretId, actionId]);
+            const secret = await this.db.secret.delete({
+                where: {
+                    id: parseInt(secretId),
+                    actionId: parseInt(actionId)
+                }
+            });
+
             if (!secret) {
                 return res.status(404).json({ error: 'Secret not found' });
             }
 
-            await runAsync(this.db,
-                'DELETE FROM secrets WHERE id = ? AND action_id = ?',
-                [secretId, actionId]
-            );
-
             res.json({ message: 'Secret deleted successfully' });
         } catch (err) {
+            console.error('Error deleting secret:', err);
             res.status(500).json({ error: err.message });
         }
     }

@@ -23,16 +23,16 @@ app.use(bodyParser.json());
 async function initializeApp() {
     try {
         // Initialize database first
-        const db = await initializeDatabase();
+        const prisma = await initializeDatabase();
         console.log('Database initialized successfully');
-        
+
         // Initialize services with database instance
-        const projectService = new ProjectService(db);
+        const projectService = new ProjectService(prisma);
         console.log('Project service initialized');
 
         // Initialize controllers with database instance
-        const projectController = new ProjectController(projectService, db);
-        const actionController = new ActionController(db);
+        const projectController = new ProjectController(projectService, prisma);
+        const actionController = new ActionController(prisma);
         console.log('Controllers initialized');
 
         // Setup routes
@@ -58,12 +58,11 @@ async function initializeApp() {
         });
 
         // Handle graceful shutdown
-        process.on('SIGTERM', () => {
+        process.on('SIGTERM', async () => {
             console.log('SIGTERM signal received: closing HTTP server');
-            db.close(() => {
-                console.log('Database connection closed');
-                process.exit(0);
-            });
+            await prisma.$disconnect();
+            console.log('Database connection closed');
+            process.exit(0);
         });
 
     } catch (err) {

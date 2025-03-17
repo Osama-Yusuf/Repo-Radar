@@ -21,6 +21,20 @@ services:
       - "${PORT:-3001}:${PORT:-3001}"
     environment:
       - PORT=${PORT:-3001}
-      # - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/repo_radar?schema=public
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=repo_radar
     volumes:
-      - ./backend/database.sqlite:/app/database.sqlite
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

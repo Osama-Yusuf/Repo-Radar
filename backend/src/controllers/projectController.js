@@ -8,23 +8,25 @@ class ProjectController {
 
     async getAllProjects(req, res) {
         try {
-            const projects = await allAsync(this.db, `
-                SELECT p.*, GROUP_CONCAT(b.branch_name) as branches
-                FROM projects p
-                LEFT JOIN branches b ON p.id = b.project_id
-                GROUP BY p.id
-            `);
+            const projects = await this.db.project.findMany({
+                include: {
+                    branches: true,
+                    actions: true
+                }
+            });
 
-            const projectsWithActions = await Promise.all(projects.map(async (project) => {
-                const actions = await allAsync(this.db, 'SELECT * FROM actions WHERE project_id = ?', [project.id]);
-                return {
-                    ...project,
-                    branches: project.branches ? project.branches.split(',') : [],
-                    actions: actions || []
-                };
+            const projectsWithFormattedData = projects.map(project => ({
+                id: project.id,
+                name: project.name,
+                repo_url: project.repoUrl,
+                check_interval: project.checkInterval,
+                created_at: project.createdAt,
+                updated_at: project.updatedAt,
+                branches: project.branches.map(b => b.branchName),
+                actions: project.actions
             }));
 
-            res.json(projectsWithActions);
+            res.json(projectsWithFormattedData);
         } catch (err) {
             console.error('Error fetching projects:', err);
             res.status(500).json({ error: err.message });
@@ -35,18 +37,30 @@ class ProjectController {
         const { id } = req.params;
 
         try {
-            const project = await getAsync(this.db, 'SELECT * FROM projects WHERE id = ?', [id]);
+            const project = await this.db.project.findUnique({
+                where: { id: parseInt(id) },
+                include: {
+                    branches: true,
+                    actions: true
+                }
+            });
+
             if (!project) {
                 return res.status(404).json({ error: 'Project not found' });
             }
 
-            const branches = await allAsync(this.db, 'SELECT branch_name FROM branches WHERE project_id = ?', [id]);
-            project.branches = branches.map(b => b.branch_name);
+            const formattedProject = {
+                id: project.id,
+                name: project.name,
+                repo_url: project.repoUrl,
+                check_interval: project.checkInterval,
+                created_at: project.createdAt,
+                updated_at: project.updatedAt,
+                branches: project.branches.map(b => b.branchName),
+                actions: project.actions
+            };
 
-            const actions = await allAsync(this.db, 'SELECT * FROM actions WHERE project_id = ?', [id]);
-            project.actions = actions;
-
-            res.json(project);
+            res.json(formattedProject);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -55,79 +69,102 @@ class ProjectController {
     async createProject(req, res) {
         const { name, repoUrl, branches, checkInterval } = req.body;
 
+        if (!name || !repoUrl || !branches || !Array.isArray(branches) || branches.length === 0) {
+            return res.status(400).json({ error: 'Name, repository URL, and at least one branch are required' });
+        }
+
         if (checkInterval && checkInterval < 1) {
             return res.status(400).json({ error: 'Check interval must be at least 1 minute' });
         }
 
         try {
-            const projectId = await runAsync(this.db, 
-                'INSERT INTO projects (name, repo_url, check_interval) VALUES (?, ?, ?)',
-                [name, repoUrl, checkInterval || 5]
-            ).then(result => result.lastID);
-
-            const branchPromises = branches.map(branch => {
-                return runAsync(this.db, 
-                    'INSERT INTO branches (project_id, branch_name) VALUES (?, ?)',
-                    [projectId, branch.trim()]
-                );
+            const project = await this.db.project.create({
+                data: {
+                    name,
+                    repoUrl,
+                    checkInterval: checkInterval || 5,
+                    branches: {
+                        create: branches.map(branch => ({
+                            branchName: branch.trim()
+                        }))
+                    }
+                },
+                include: {
+                    branches: true
+                }
             });
 
-            await Promise.all(branchPromises);
-
-            const project = {
-                id: projectId,
-                name,
-                repo_url: repoUrl,
-                check_interval: checkInterval || 5
+            await this.projectService.setupProjectTimer(project);
+            const formattedProject = {
+                id: project.id,
+                name: project.name,
+                repo_url: project.repoUrl,
+                check_interval: project.checkInterval,
+                created_at: project.createdAt,
+                updated_at: project.updatedAt,
+                branches: project.branches.map(b => b.branchName),
+                actions: []
             };
-
-            this.projectService.setupProjectTimer(project);
-            res.status(201).json(project);
+            res.status(201).json(formattedProject);
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Error creating project:', err);
+            res.status(500).json({ error: 'Failed to create project. Please try again.' });
         }
     }
 
     async updateProject(req, res) {
         const { id } = req.params;
-        const { name, repoUrl, branches, checkInterval } = req.body;
+        const { name, repositoryUrl, branches, checkInterval } = req.body;
 
-        if (checkInterval && checkInterval < 1) {
-            return res.status(400).json({ error: 'Check interval must be at least 1 minute' });
+        // Validate check interval more strictly
+        const interval = parseInt(checkInterval) || 5;
+        if (interval < 1 || interval > 1440) { // Max 24 hours
+            return res.status(400).json({ error: 'Check interval must be between 1 and 1440 minutes' });
         }
 
         try {
-            await runAsync(this.db, 'BEGIN TRANSACTION');
+            // Clear existing timer before update to prevent duplicate timers
+            this.projectService.clearTimer(parseInt(id));
 
-            await runAsync(this.db, 
-                'UPDATE projects SET name = ?, repo_url = ?, check_interval = ? WHERE id = ?',
-                [name, repoUrl, checkInterval, id]
-            );
-
-            await runAsync(this.db, 'DELETE FROM branches WHERE project_id = ?', [id]);
-
-            const branchPromises = branches.map(branch => {
-                return runAsync(this.db, 
-                    'INSERT INTO branches (project_id, branch_name) VALUES (?, ?)',
-                    [id, branch.trim()]
-                );
+            const project = await this.db.project.update({
+                where: { id: parseInt(id) },
+                data: {
+                    name,
+                    repoUrl: repositoryUrl,
+                    checkInterval: interval,
+                    branches: {
+                        deleteMany: {},
+                        create: branches.map(branch => ({
+                            branchName: branch.trim()
+                        }))
+                    }
+                },
+                include: {
+                    branches: true,
+                    actions: true
+                }
             });
 
-            await Promise.all(branchPromises);
-            await runAsync(this.db, 'COMMIT');
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
 
-            const project = {
-                id: parseInt(id),
-                name,
-                repo_url: repoUrl,
-                check_interval: checkInterval,
-                branches
+            const formattedProject = {
+                id: project.id,
+                name: project.name,
+                repo_url: project.repoUrl,
+                check_interval: interval,
+                created_at: project.createdAt,
+                updated_at: project.updatedAt,
+                branches: project.branches.map(b => b.branchName),
+                actions: project.actions
             };
 
-            this.projectService.setupProjectTimer(project);
-            res.json(project);
+            // Setup new timer with validated interval
+            this.projectService.setupProjectTimer(formattedProject);
+            res.json(formattedProject);
         } catch (err) {
-            await runAsync(this.db, 'ROLLBACK');
+            // Error handling for transaction is managed by Prisma
             console.error('Error updating project:', err);
             res.status(500).json({ error: err.message });
         }
@@ -138,14 +175,20 @@ class ProjectController {
 
         try {
             this.projectService.clearTimer(parseInt(id));
-            await runAsync(this.db, 'DELETE FROM branches WHERE project_id = ?', [id]);
-            await runAsync(this.db, 'DELETE FROM projects WHERE id = ?', [id]);
 
-            if (await getAsync(this.db, 'SELECT id FROM projects WHERE id = ?', [id])) {
-                res.status(404).json({ error: 'Project not found' });
-            } else {
-                res.json({ message: 'Project deleted successfully' });
+            const project = await this.db.project.delete({
+                where: { id: parseInt(id) },
+                include: {
+                    branches: true,
+                    actions: true
+                }
+            }).catch(() => null);
+
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
             }
+
+            res.json({ message: 'Project deleted successfully' });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -156,20 +199,43 @@ class ProjectController {
         const { limit = 50 } = req.query;
 
         try {
-            const logs = await allAsync(this.db, `
-                SELECT 
-                    cl.*,
-                    p.name as project_name,
-                    p.repo_url
-                FROM check_logs cl
-                JOIN projects p ON cl.project_id = p.id
-                WHERE cl.project_id = ?
-                ORDER BY cl.checked_at DESC
-                LIMIT ?
-            `, [projectId, limit]);
+            const logs = await this.db.checkLog.findMany({
+                where: {
+                    projectId: parseInt(projectId)
+                },
+                include: {
+                    project: {
+                        select: {
+                            name: true,
+                            repoUrl: true
+                        }
+                    }
+                },
+                orderBy: {
+                    checkedAt: 'desc'
+                },
+                take: parseInt(limit)
+            });
 
-            res.json(logs);
+            const formattedLogs = logs.map(log => ({
+                id: log.id,
+                project_id: log.projectId,
+                branch_name: log.branchName,
+                commit_sha: log.commitSha,
+                commit_message: log.commitMessage,
+                commit_author: log.commitAuthor,
+                commit_date: log.commitDate,
+                checked_at: log.checkedAt,
+                status: log.status,
+                project: {
+                    name: log.project.name,
+                    repo_url: log.project.repoUrl
+                }
+            }));
+
+            res.json(formattedLogs);
         } catch (err) {
+            console.error('Error fetching project logs:', err);
             res.status(500).json({ error: err.message });
         }
     }
