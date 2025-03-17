@@ -3,11 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   GitHub as GitHubIcon,
   Memory as MemoryIcon,
+  Timeline as TimelineIcon,
 } from '@mui/icons-material';
 
 const navItems = [
   { path: '/', label: 'Repositories', icon: <GitHubIcon /> },
   { path: '/pods', label: 'Pod Status', icon: <MemoryIcon /> },
+  { path: '/pipeline-status', label: 'Pipeline Status', icon: <TimelineIcon /> },
 ];
 
 const SideNav = () => {

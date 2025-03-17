@@ -22,30 +22,20 @@ const formatAge = (startTime) => {
 router.get('/pods', async (req, res) => {
   try {
     const response = await k8sApi.listNamespacedPod('default');
-    const pods = response.body.items.map(pod => {
-      const containerStatuses = pod.status.containerStatuses || [];
-      const ready = `${containerStatuses.filter(c => c.ready).length}/${containerStatuses.length}`;
-      const restarts = containerStatuses.reduce((sum, c) => sum + (c.restartCount || 0), 0);
-
-      // Get the first container's image
-      const image = pod.spec.containers[0]?.image || '';
-
-      return {
-        name: pod.metadata.name,
-        status: pod.status.phase,
-        ready: ready,
-        restarts: restarts,
-        age: formatAge(pod.metadata.creationTimestamp),
-        image: image,
-        containerStatuses: containerStatuses.map(status => ({
-          name: status.name,
-          ready: status.ready,
-          restartCount: status.restartCount,
-          state: status.state
-        })),
-        logs: null
-      };
-    });
+    const pods = response.body.items.map(pod => ({
+      name: pod.metadata.name,
+      namespace: pod.metadata.namespace,
+      status: pod.status.phase,
+      creationTime: pod.metadata.creationTimestamp,
+      containers: pod.spec.containers.map(container => ({
+        name: container.name,
+        image: container.image
+      })),
+      ready: `${pod.status.containerStatuses.filter(c => c.ready).length}/${pod.status.containerStatuses.length}`,
+      restarts: pod.status.containerStatuses.reduce((sum, c) => sum + (c.restartCount || 0), 0),
+      age: formatAge(pod.metadata.creationTimestamp),
+      logs: null
+    }));
 
     res.json(pods);
   } catch (error) {

@@ -35,7 +35,7 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
         }}>
           <SearchIcon sx={{ color: 'rgba(255, 255, 255, 0.7)', mr: 1 }} />
           <InputBase
-            placeholder="Search repositories, pods, branches, commit..."
+            placeholder="Search repositories, pods, pipelines, commit..."
             sx={{
               color: '#fff',
               flex: 1,

@@ -14,6 +14,7 @@ import LogsDialog from './components/logs/LogsDialog';
 
 // Pages
 import PodStatus from './pages/PodStatus';
+import PipelineStatus from './pages/PipelineStatus';
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -564,6 +565,7 @@ function App() {
                 } 
               />
               <Route path="/pods" element={<PodStatus />} />
+              <Route path="/pipeline-status" element={<PipelineStatus />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 

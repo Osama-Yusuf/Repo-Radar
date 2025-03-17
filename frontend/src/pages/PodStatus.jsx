@@ -1,28 +1,31 @@
-import { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Typography, 
-  Paper, 
-  Box,
+import React, { useState, useEffect } from 'react';
+import {
+  Container,
   Grid,
-  CircularProgress,
-  IconButton,
+  Box,
+  Typography,
   Dialog,
   DialogTitle,
   DialogContent,
+  CircularProgress,
   DialogActions,
   Button,
   Tooltip,
+  Paper,
+  IconButton,
+  FormControl,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Terminal as LogsIcon,
   CheckCircle as SuccessIcon,
-  Error as ErrorIcon,
   Warning as WarningIcon,
   Pending as PendingIcon,
-  Refresh as RefreshIcon,
-  RestartAlt as RestartIcon,
-  GitHub as GitHubIcon,
+  PlayArrow as RunningIcon,
+  Error as ErrorIcon,
+  AccessTime,
+  GitHub
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
@@ -34,7 +37,55 @@ const PodStatus = () => {
   const [selectedPod, setSelectedPod] = useState(null);
   const [podLogs, setPodLogs] = useState('');
   const [logsLoading, setLogsLoading] = useState(false);
+  const [sortOption, setSortOption] = useState('creationTime-desc');
   const { searchQuery } = useSearch();
+
+  const sortOptions = [
+    { value: 'creationTime-desc', label: 'Newest First' },
+    { value: 'creationTime-asc', label: 'Oldest First' },
+    { value: 'name-asc', label: 'Name (A-Z)' },
+    { value: 'name-desc', label: 'Name (Z-A)' },
+    { value: 'status-asc', label: 'Status (Running First)' },
+    { value: 'status-desc', label: 'Status (Failed First)' },
+    { value: 'restarts-asc', label: 'Restarts (Low to High)' },
+    { value: 'restarts-desc', label: 'Restarts (High to Low)' }
+  ];
+
+  const sortPods = (pods) => {
+    const [field, order] = sortOption.split('-');
+    return [...pods].sort((a, b) => {
+      switch (field) {
+        case 'creationTime':
+          return order === 'desc'
+            ? new Date(b.creationTime) - new Date(a.creationTime)
+            : new Date(a.creationTime) - new Date(b.creationTime);
+        case 'name':
+          return order === 'desc'
+            ? b.name.localeCompare(a.name)
+            : a.name.localeCompare(b.name);
+        case 'status':
+          const statusOrder = {
+            'Running': 1,
+            'Pending': 2,
+            'Succeeded': 3,
+            'Failed': 4,
+            'Unknown': 5,
+            'CrashLoopBackOff': 6
+          };
+          const statusA = statusOrder[a.status] || 999;
+          const statusB = statusOrder[b.status] || 999;
+          return order === 'desc'
+            ? statusB - statusA
+            : statusA - statusB;
+        case 'restarts':
+          return order === 'desc'
+            ? b.restarts - a.restarts
+            : a.restarts - b.restarts;
+        default:
+          return 0;
+      }
+    });
+  };
 
   const fetchPods = async () => {
     try {
@@ -83,7 +134,7 @@ const PodStatus = () => {
       return {
         status: 'CrashLoopBackOff',
         color: '#ff5252',
-        icon: <RestartIcon />,
+        icon: <RunningIcon />,
         bgColor: 'rgba(255, 82, 82, 0.1)',
         borderColor: 'rgba(255, 82, 82, 0.3)'
       };
@@ -182,14 +233,74 @@ const PodStatus = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
-          Pod Status
-        </Typography>
-      </Box>
-
       <Grid container spacing={3}>
-        {filteredPods.map((pod) => {
+        <Grid item xs={12}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            mb: 3 
+          }}>
+            <Typography variant="h5" sx={{ color: '#fff' }}>
+              Pod Status
+            </Typography>
+            <FormControl 
+              variant="outlined" 
+              size="small"
+              sx={{ 
+                minWidth: 200,
+                '& .MuiOutlinedInput-root': {
+                  color: '#fff',
+                  '& fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.23)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.4)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#fff',
+                  },
+                },
+                '& .MuiSelect-icon': {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                }
+              }}
+            >
+              <Select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value)}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: 'rgba(30, 30, 30, 0.95)',
+                      backdropFilter: 'blur(10px)',
+                      '& .MuiMenuItem-root': {
+                        color: '#fff',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: 'rgba(255, 255, 255, 0.15)',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          },
+                        },
+                      },
+                    },
+                  },
+                }}
+              >
+                {sortOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Grid>
+
+        {sortPods(filteredPods).map((pod) => {
           const statusInfo = getPodStatus(pod);
           return (
             <Grid item xs={12} sm={6} md={4} lg={3} key={pod.name}>
@@ -232,11 +343,27 @@ const PodStatus = () => {
                         color: '#fff',
                         fontWeight: 500,
                         wordBreak: 'break-word',
-                        fontSize: '0.9rem'
+                        fontSize: '0.9rem',
+                        mb: 1
                       }}
                     >
                       {pod.name}
                     </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: 'rgba(255, 255, 255, 0.7)',
+                          fontSize: '0.75rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5
+                        }}
+                      >
+                        <AccessTime sx={{ fontSize: '1rem' }} />
+                        Created {new Date(pod.creationTime).toLocaleString()}
+                      </Typography>
+                    </Box>
                   </Box>
                   <Tooltip title="View Logs">
                     <IconButton 
