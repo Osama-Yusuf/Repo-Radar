@@ -46,6 +46,8 @@ USER appuser
 
 EXPOSE 3001
 
-# Use shell form to run migrations before starting the app
-CMD pnpm exec prisma migrate deploy && \
-    pnpm start
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Change CMD to use the script
+CMD ["./start.sh"]
