@@ -46,8 +46,12 @@ USER appuser
 
 EXPOSE 3001
 
-COPY start.sh .
-RUN chmod +x start.sh
+CMD if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
+      echo "Detected ppc64le architecture - skipping Prisma migrations"; \
+      # Just start the app without migrations
+      pnpm start; \
+    else \
+      # For supported architectures, run migrations normally
+      pnpm exec prisma migrate deploy && pnpm start; \
+    fi
 
-# Change CMD to use the script
-CMD ["./start.sh"]
