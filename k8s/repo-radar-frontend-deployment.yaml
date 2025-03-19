@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: repo-radar-frontend
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: repo-radar-frontend
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: qnnp-services-0.1.0
+  name: repo-radar-frontend-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: repo-radar-frontend
+      app.kubernetes.io/name: repo-radar-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: repo-radar-frontend
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: repo-radar-frontend
+        app.kubernetes.io/version: 1.16.0
+        helm.sh/chart: qnnp-services-0.1.0
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - stgocworker1.stgocp.mwanitest.local
+                - stgocworker2.stgocp.mwanitest.local
+                - stgocworker3.stgocp.mwanitest.local
+      containers:
+      - env:
+        - name: DUMMY_KEY
+          valueFrom:
+            configMapKeyRef:
+              key: DUMMY_KEY
+              name: repo-radar-frontend-config
+        - name: VITE_BACKEND_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: VITE_BACKEND_BASE_URL
+              name: repo-radar-frontend-config
+        - name: VITE_BACKEND_BASE_URL_OLD
+          valueFrom:
+            configMapKeyRef:
+              key: VITE_BACKEND_BASE_URL_OLD
+              name: repo-radar-frontend-config
+        - name: VITE_PORT
+          valueFrom:
+            configMapKeyRef:
+              key: VITE_PORT
+              name: repo-radar-frontend-config
+        - name: API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: VITE_BACKEND_BASE_URL_OLD
+              name: repo-radar-frontend-config
+        - name: BACKEND_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: VITE_BACKEND_BASE_URL
+              name: repo-radar-frontend-config
+        image: image-registry.openshift-image-registry.svc:5000/devops/repo-radar-frontend:f85781f--2025.03.19-13.05.42
+        imagePullPolicy: IfNotPresent
+        name: repo-radar-frontend
+        ports:
+        - containerPort: 5173
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1500Mi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsGroup: 1000680000
+          runAsUser: 1000680000
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: image-registry-secret
+      restartPolicy: Always
+      securityContext:
+        fsGroup: 1000680000
+        runAsGroup: 1000680000
+        runAsUser: 1000680000
+      serviceAccount: repo-radar-frontend-sa
+      serviceAccountName: repo-radar-frontend-sa

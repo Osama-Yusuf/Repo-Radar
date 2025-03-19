@@ -28,7 +28,7 @@ const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
 
-function RepositoriesPage({ 
+function RepositoriesPage({
   projects,
   loading,
   error,
@@ -58,16 +58,16 @@ function RepositoriesPage({
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        mb: 3 
+        mb: 3
       }}>
         <Typography variant="h4" sx={{ fontWeight: 600, color: '#fff' }}>
           Monitored Repositories
         </Typography>
-        
+
         <Box sx={{ display: 'flex', gap: 1 }}>
           {[
             { label: 'Name', field: 'name' },
@@ -113,13 +113,13 @@ function RepositoriesPage({
                 {searchQuery ? 'No matching repositories found' : 'No repositories monitored yet'}
               </Typography>
               <Typography variant="body1" sx={{ color: '#6b6d7c', mb: 4 }}>
-                {searchQuery ? 
-                  'Try adjusting your search query' : 
+                {searchQuery ?
+                  'Try adjusting your search query' :
                   'Click the "Add Project" button above to start monitoring your first repository'
                 }
               </Typography>
               {!searchQuery && (
-                <div style={{ 
+                <div style={{
                   width: '60px',
                   height: '60px',
                   margin: '0 auto',
@@ -221,10 +221,10 @@ function App() {
 
   const sortProjects = (projects) => {
     if (!Array.isArray(projects)) return [];
-    
+
     return [...projects].sort((a, b) => {
       const direction = sortConfig.direction === 'asc' ? 1 : -1;
-      
+
       switch (sortConfig.field) {
         case 'name':
           return direction * ((a?.name || '').localeCompare(b?.name || ''));
@@ -311,11 +311,11 @@ function App() {
       ...project,
       branches: projectBranches
     });
-    
+
     if (action) {
       console.log('Editing action:', action);
       setEditingAction(action);
-      
+
       // Initialize webhook parameters from existing action
       const webhookParams = {};
       projectBranches.forEach(branch => {
@@ -323,9 +323,9 @@ function App() {
           ?.filter(param => param.branch === branch)
           .map(param => ({ name: param.name, value: param.value })) || [];
       });
-      
+
       console.log('Initialized webhook params:', webhookParams);
-      
+
       setActionFormData({
         name: action.name || '',
         actionType: action.actionType,
@@ -333,20 +333,20 @@ function App() {
         scriptContent: action.scriptContent || '',
         webhookParams
       });
-      
+
       loadSecrets(action.id);
     } else {
       console.log('Creating new action');
       setEditingAction(null);
-      
+
       // Initialize empty webhook parameters for each branch
       const webhookParams = {};
       projectBranches.forEach(branch => {
         webhookParams[branch] = [];
       });
-      
+
       console.log('Initialized empty webhook params:', webhookParams);
-      
+
       setActionFormData({
         name: '',
         actionType: 'webhook',
@@ -378,7 +378,7 @@ function App() {
     try {
       console.log('Starting to save action...');
       console.log('Action Form Data:', JSON.stringify(actionFormData, null, 2));
-      
+
       // Convert webhook parameters to array format for backend
       const webhookParamsArray = [];
       if (actionFormData.webhookParams) {
@@ -410,10 +410,10 @@ function App() {
       console.log('Editing Action:', editingAction);
 
       let response;
-      const url = editingAction 
+      const url = editingAction
         ? `/projects/${selectedProject.id}/actions/${editingAction.id}`
         : `/projects/${selectedProject.id}/actions`;
-      
+
       console.log('Request URL:', url);
       console.log('Request Method:', editingAction ? 'PUT' : 'POST');
 
@@ -500,7 +500,7 @@ function App() {
   const handleTriggerAction = async (projectId, branch) => {
     try {
       const response = await axiosInstance.post(`/projects/${projectId}/trigger`, { branch });
-      
+
       // Handle different success scenarios
       if (response.data.message) {
         console.log(response.data.message);
@@ -516,7 +516,7 @@ function App() {
       if (err.response?.data?.details) {
         // Show the main error message
         console.error(err.response.data.error);
-        
+
         // Show individual action failures
         err.response.data.details.forEach(detail => {
           console.error(`Action ${detail.actionId}: ${detail.error}`);
@@ -530,25 +530,25 @@ function App() {
   return (
     <SearchProvider>
       <Router>
-        <div className="App" style={{ 
-          minHeight: '100vh', 
+        <div className="App" style={{
+          minHeight: '100vh',
           background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
           color: '#fff',
           display: 'flex'
         }}>
           <SideNav />
           <Box sx={{ flex: 1, ml: '80px' }}>
-            <Header 
-              onRefresh={() => fetchProjects(true)} 
-              onAddProject={() => handleOpenDialog()} 
+            <Header
+              onRefresh={() => fetchProjects(true)}
+              onAddProject={() => handleOpenDialog()}
               isRefreshing={refreshing}
             />
 
             <Routes>
-              <Route 
-                path="/" 
+              <Route
+                path="/"
                 element={
-                  <RepositoriesPage 
+                  <RepositoriesPage
                     projects={projects}
                     loading={loading}
                     error={error}
@@ -562,7 +562,7 @@ function App() {
                     handleSort={handleSort}
                     sortProjects={sortProjects}
                   />
-                } 
+                }
               />
               <Route path="/pods" element={<PodStatus />} />
               <Route path="/pipeline-status" element={<PipelineStatus />} />

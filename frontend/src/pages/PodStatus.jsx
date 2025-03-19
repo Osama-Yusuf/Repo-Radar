@@ -37,6 +37,16 @@ import {
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
 
+// Define the API base URL in the same way as App.jsx
+const PORT = import.meta.env.VITE_PORT || '3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+console.log(`API_BASE_URL (PodStatus): ${API_BASE_URL}`);
+
+// Create a dedicated axios instance for this component
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
+
 const PodStatus = () => {
   const [pods, setPods] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +106,7 @@ const PodStatus = () => {
 
   const fetchPods = async () => {
     try {
-      const response = await axios.get('/api/k8s/pods');
+      const response = await apiClient.get('/k8s/pods');
       setPods(response.data);
       setError(null);
     } catch (err) {
@@ -109,7 +119,7 @@ const PodStatus = () => {
   const fetchPodLogs = async (podName) => {
     setLogsLoading(true);
     try {
-      const response = await axios.get(`/api/k8s/pods/${podName}/logs`);
+      const response = await apiClient.get(`/k8s/pods/${podName}/logs`);
       setPodLogs(response.data.logs || 'No logs available');
     } catch (err) {
       console.error('Error fetching logs:', err);
@@ -151,7 +161,7 @@ const PodStatus = () => {
     const containerStatuses = pod.containerStatuses || [];
     const hasFailedContainer = containerStatuses.some(
       status => status.state?.waiting?.reason === 'CrashLoopBackOff' ||
-                status.state?.waiting?.reason === 'Error'
+        status.state?.waiting?.reason === 'Error'
     );
 
     if (hasFailedContainer) {
@@ -203,13 +213,13 @@ const PodStatus = () => {
   const filteredPods = pods.filter(pod => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    
+
     // Extract commit hash from image if it exists
     const commitHash = pod.image ? (pod.image.match(/:([a-f0-9]{7})--/) || [])[1] : '';
-    
+
     // Clean up the search query to handle various formats
     const cleanQuery = query.replace(/[^a-f0-9]/g, '');
-    
+
     return (
       pod.name.toLowerCase().includes(query) ||
       pod.status.toLowerCase().includes(query) ||
@@ -242,19 +252,19 @@ const PodStatus = () => {
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Grid container spacing={3}>
         <Grid item xs={12}>
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            mb: 3 
+            mb: 3
           }}>
             <Typography variant="h5" sx={{ color: '#fff' }}>
               Pod Status
             </Typography>
-            <FormControl 
-              variant="outlined" 
+            <FormControl
+              variant="outlined"
               size="small"
-              sx={{ 
+              sx={{
                 minWidth: 200,
                 '& .MuiOutlinedInput-root': {
                   color: '#fff',
@@ -325,18 +335,18 @@ const PodStatus = () => {
                   background: 'rgba(255, 255, 255, 0.05)'
                 }
               }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'flex-start', 
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
                   mb: 2,
                   pb: 2,
                   borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                 }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
-                    <Typography 
-                      variant="subtitle2" 
-                      sx={{ 
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.6)',
                         mb: 0.5,
                         fontSize: '0.75rem'
@@ -344,9 +354,9 @@ const PodStatus = () => {
                     >
                       POD NAME
                     </Typography>
-                    <Typography 
-                      variant="body1" 
-                      sx={{ 
+                    <Typography
+                      variant="body1"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500,
                         wordBreak: 'break-word',
@@ -373,10 +383,10 @@ const PodStatus = () => {
                     </Box>
                   </Box>
                   <Tooltip title="View Logs">
-                    <IconButton 
+                    <IconButton
                       size="small"
                       onClick={() => handleOpenLogs(pod)}
-                      sx={{ 
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.7)',
                         '&:hover': { color: '#fff', background: 'rgba(255, 255, 255, 0.1)' }
                       }}
@@ -396,7 +406,7 @@ const PodStatus = () => {
                     backgroundColor: statusInfo.bgColor,
                     border: `1px solid ${statusInfo.borderColor}`
                   }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       color: statusInfo.color,
                       display: 'flex',
                       alignItems: 'center'
@@ -412,9 +422,9 @@ const PodStatus = () => {
                 <Grid container spacing={2}>
                   {pod.resources && pod.resources.length > 0 && (
                     <Grid item xs={12}>
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
+                      <Typography
+                        variant="caption"
+                        sx={{
                           color: 'rgba(255, 255, 255, 0.5)',
                           display: 'block',
                           mb: 1
@@ -423,9 +433,9 @@ const PodStatus = () => {
                         Resources
                       </Typography>
                       {pod.resources.map((container, index) => (
-                        <Box 
+                        <Box
                           key={container.name}
-                          sx={{ 
+                          sx={{
                             mb: index !== pod.resources.length - 1 ? 2 : 0,
                             pb: index !== pod.resources.length - 1 ? 2 : 0,
                             borderBottom: index !== pod.resources.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
@@ -456,7 +466,7 @@ const PodStatus = () => {
                                   border: '1px solid rgba(33, 150, 243, 0.2)'
                                 }}
                               >
-                                <SpeedIcon sx={{ 
+                                <SpeedIcon sx={{
                                   color: '#2196f3',
                                   fontSize: '1.2rem'
                                 }} />
@@ -485,7 +495,7 @@ const PodStatus = () => {
                                   border: '1px solid rgba(156, 39, 176, 0.2)'
                                 }}
                               >
-                                <MemoryIcon sx={{ 
+                                <MemoryIcon sx={{
                                   color: '#9c27b0',
                                   fontSize: '1.2rem'
                                 }} />
@@ -551,18 +561,18 @@ const PodStatus = () => {
                     </Grid>
                   )}
                   <Grid item xs={4}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block'
                       }}
                     >
                       Ready
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500
                       }}
@@ -571,9 +581,9 @@ const PodStatus = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 0.5
@@ -581,9 +591,9 @@ const PodStatus = () => {
                     >
                       Restarts
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         fontWeight: 500,
                         color: pod.restarts > 0 ? '#ff9800' : '#fff'
                       }}
@@ -592,9 +602,9 @@ const PodStatus = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 0.5
@@ -602,9 +612,9 @@ const PodStatus = () => {
                     >
                       Age
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500
                       }}
@@ -691,17 +701,17 @@ const PodStatus = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <Paper sx={{ 
-              p: 2, 
+            <Paper sx={{
+              p: 2,
               mt: 2,
               background: 'rgba(0, 0, 0, 0.3)',
               maxHeight: '500px',
               overflow: 'auto',
               borderRadius: '8px'
             }}>
-              <pre style={{ 
-                color: '#fff', 
-                margin: 0, 
+              <pre style={{
+                color: '#fff',
+                margin: 0,
                 whiteSpace: 'pre-wrap',
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: '0.85rem'
@@ -712,7 +722,7 @@ const PodStatus = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <Button 
+          <Button
             onClick={handleCloseLogs}
             variant="contained"
             sx={{

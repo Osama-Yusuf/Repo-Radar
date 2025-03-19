@@ -31,6 +31,16 @@ import {
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
 
+// Define the API base URL in the same way as App.jsx
+const PORT = import.meta.env.VITE_PORT || '3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+console.log(`API_BASE_URL (PipelineStatus): ${API_BASE_URL}`);
+
+// Create a dedicated axios instance for this component
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
+
 const PipelineStatus = () => {
   const [pipelines, setPipelines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +108,7 @@ const PipelineStatus = () => {
 
   const fetchPipelines = async () => {
     try {
-      const response = await axios.get('/api/tekton/pipelineruns');
+      const response = await apiClient.get('tekton/pipelineruns');
       setPipelines(response.data);
       setError(null);
     } catch (err) {
@@ -111,7 +121,7 @@ const PipelineStatus = () => {
   const fetchTaskLogs = async (pipelineName, taskName) => {
     setLogsLoading(true);
     try {
-      const response = await axios.get(`/api/tekton/pipelineruns/${pipelineName}/logs/${taskName}`);
+      const response = await apiClient.get(`/tekton/pipelineruns/${pipelineName}/logs/${taskName}`);
       setTaskLogs(response.data.logs || 'No logs available');
     } catch (err) {
       console.error('Error fetching logs:', err);
@@ -124,7 +134,7 @@ const PipelineStatus = () => {
   const fetchPipelineLogs = async (pipeline) => {
     setPipelineLogsLoading(true);
     try {
-      const response = await axios.get(`/api/tekton/pipelineruns/${pipeline.name}/logs`);
+      const response = await apiClient.get(`/tekton/pipelineruns/${pipeline.name}/logs`);
       setPipelineLogs({
         pipeline,
         logs: response.data.logs || {}
@@ -205,7 +215,7 @@ const PipelineStatus = () => {
   const filteredPipelines = pipelines.filter(pipeline => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    
+
     // Search in pipeline name, status, and pipeline type
     const basicMatch = pipeline.name.toLowerCase().includes(query) ||
       pipeline.status.toLowerCase().includes(query) ||
@@ -242,10 +252,10 @@ const PipelineStatus = () => {
         <Typography variant="h5" sx={{ color: '#fff' }}>
           Pipeline Status
         </Typography>
-        <FormControl 
-          variant="outlined" 
+        <FormControl
+          variant="outlined"
           size="small"
-          sx={{ 
+          sx={{
             minWidth: 200,
             '& .MuiOutlinedInput-root': {
               color: '#fff',
@@ -316,18 +326,18 @@ const PipelineStatus = () => {
                   background: 'rgba(255, 255, 255, 0.05)'
                 }
               }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'flex-start', 
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
                   mb: 2,
                   pb: 2,
                   borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                 }}>
                   <Box sx={{ flex: 1, mr: 2 }}>
-                    <Typography 
-                      variant="subtitle2" 
-                      sx={{ 
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.6)',
                         mb: 0.5,
                         fontSize: '0.75rem'
@@ -335,9 +345,9 @@ const PipelineStatus = () => {
                     >
                       PIPELINE NAME
                     </Typography>
-                    <Typography 
-                      variant="body1" 
-                      sx={{ 
+                    <Typography
+                      variant="body1"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500,
                         wordBreak: 'break-word',
@@ -432,7 +442,7 @@ const PipelineStatus = () => {
                     backgroundColor: statusInfo.bgColor,
                     border: `1px solid ${statusInfo.borderColor}`
                   }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       color: statusInfo.color,
                       display: 'flex',
                       alignItems: 'center'
@@ -447,9 +457,9 @@ const PipelineStatus = () => {
 
                 {pipeline.params && pipeline.params.length > 0 && (
                   <Box sx={{ mb: 2.5 }}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 1
@@ -457,10 +467,10 @@ const PipelineStatus = () => {
                     >
                       Parameters
                     </Typography>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexWrap: 'wrap', 
-                      gap: 1 
+                    <Box sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 1
                     }}>
                       {pipeline.params.map((param) => (
                         <Box
@@ -507,9 +517,9 @@ const PipelineStatus = () => {
 
                 <Grid container spacing={2}>
                   <Grid item xs={6}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 0.5
@@ -517,9 +527,9 @@ const PipelineStatus = () => {
                     >
                       Pipeline
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500
                       }}
@@ -528,9 +538,9 @@ const PipelineStatus = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 0.5
@@ -538,9 +548,9 @@ const PipelineStatus = () => {
                     >
                       Duration
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         color: '#fff',
                         fontWeight: 500
                       }}
@@ -549,9 +559,9 @@ const PipelineStatus = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.5)',
                         display: 'block',
                         mb: 1

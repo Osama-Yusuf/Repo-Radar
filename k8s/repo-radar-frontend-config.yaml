@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  VITE_BACKEND_BASE_URL: https://repo-radar-backend.apps.stgocp.mwanitest.local/api
+  VITE_BACKEND_BASE_URL_OLD: http://repo-radar-backend-service.default.svc.cluster.local:3001/api
+  VITE_PORT: "3001"
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: repo-radar-frontend
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: repo-radar-frontend
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: qnnp-services-0.1.0
+  name: repo-radar-frontend-config
+  namespace: default

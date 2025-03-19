@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  DATABASE_URL: postgresql://repo_radar_user:postgres@postgres:5432/repo_radar?schema=public
+  DUMMY_KEY: dummy_value
+  GITHUB_API_URL: https://github.ibm.com/api/v3
+  KUBERNETES_SERVICE_HOST: kubernetes.default.svc
+  KUBERNETES_SERVICE_PORT: "443"
+  PORT: "3001"
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: repo-radar-backend
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: repo-radar-backend
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: qnnp-services-0.1.0
+  name: repo-radar-backend-config
+  namespace: default
