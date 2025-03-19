@@ -167,7 +167,7 @@ class ProjectService {
                         project: {
                             id: project.id,
                             name: project.name,
-                            repoUrl: project.repoUrl || project.repo_url
+                            repoUrl: project.repoUrl || project.repo_url || null
                         },
                         branch: branch.branchName,
                         commit: {
@@ -367,7 +367,7 @@ class ProjectService {
                         project: {
                             id: project.id,
                             name: project.name,
-                            repoUrl: project.repo_url
+                            repoUrl: project.repo_url || null
                         },
                         branch: branchName,
                         isManualTrigger,

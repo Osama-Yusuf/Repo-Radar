@@ -40,9 +40,21 @@ function RepositoriesPage({
   handleTriggerAction,
   sortConfig,
   handleSort,
-  sortProjects
+  sortProjects,
+  fetchProjects
 }) {
   const { searchQuery } = useSearch();
+  const [showRefreshBtn, setShowRefreshBtn] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchProjects(true);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600); // Keep animation visible for a moment
+    }
+  };
 
   const filteredAndSortedProjects = sortProjects(
     (projects || []).filter(project => {
@@ -57,7 +69,12 @@ function RepositoriesPage({
   );
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <Container
+      maxWidth="lg"
+      sx={{ mt: 4, mb: 4, position: 'relative' }}
+      onMouseEnter={() => setShowRefreshBtn(true)}
+      onMouseLeave={() => setShowRefreshBtn(false)}
+    >
       <Box sx={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -150,6 +167,67 @@ function RepositoriesPage({
           )}
         </Grid>
       )}
+
+      {/* Floating Refresh Button */}
+      <Box
+        sx={{
+          position: 'fixed',
+          right: '30px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          opacity: showRefreshBtn ? 1 : 0,
+          transition: 'opacity 0.3s ease, transform 0.3s ease',
+          '&:hover': {
+            transform: 'translateY(-50%) scale(1.1)',
+          },
+          zIndex: 10,
+        }}
+      >
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          sx={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(33, 150, 243, 0.8)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgba(33, 150, 243, 0.5)',
+            '&:hover': {
+              backgroundColor: 'rgba(33, 150, 243, 1)',
+              boxShadow: '0 6px 25px rgba(33, 150, 243, 0.7)',
+            },
+            transition: 'all 0.3s ease',
+            animation: isRefreshing ? 'pulse 1.5s infinite' : 'none',
+            '@keyframes pulse': {
+              '0%': {
+                boxShadow: '0 0 0 0 rgba(33, 150, 243, 0.7)',
+              },
+              '70%': {
+                boxShadow: '0 0 0 15px rgba(33, 150, 243, 0)',
+              },
+              '100%': {
+                boxShadow: '0 0 0 0 rgba(33, 150, 243, 0)',
+              },
+            },
+          }}
+        >
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: isRefreshing ? 'spin 1s infinite linear' : 'none',
+            '@keyframes spin': {
+              '0%': { transform: 'rotate(0deg)' },
+              '100%': { transform: 'rotate(360deg)' }
+            }
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="white" />
+            </svg>
+          </Box>
+        </Button>
+      </Box>
     </Container>
   );
 }
@@ -561,6 +639,7 @@ function App() {
                     sortConfig={sortConfig}
                     handleSort={handleSort}
                     sortProjects={sortProjects}
+                    fetchProjects={fetchProjects}
                   />
                 }
               />
