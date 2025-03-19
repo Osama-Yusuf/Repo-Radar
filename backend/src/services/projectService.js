@@ -5,11 +5,13 @@ const githubService = require('./githubService');
 const axios = require('axios');
 const path = require('path');
 const os = require('os');
-const { runAsync, getAsync, allAsync } = require('../config/database');
+const { db } = require('../config/drizzle');
+const { eq, and } = require('drizzle-orm');
+const schema = require('../schema/schema');
 
 class ProjectService {
-    constructor(db) {
-        this.db = db;
+    constructor(dbInstance) {
+        this.db = dbInstance || db; // Use provided db instance or default to the imported one
         this.projectTimers = new Map();
         this.projectCache = new Map();
     }
@@ -92,15 +94,13 @@ class ProjectService {
 
     async logCheckError(projectId, error, branchName = 'unknown') {
         try {
-            await this.db.checkLog.create({
-                data: {
-                    projectId: projectId,
-                    branchName: branchName,
-                    status: 'error',
-                    commitMessage: error.message || 'Unknown error occurred',
-                    commitDate: new Date().toISOString(),
-                    commitAuthor: 'System'
-                }
+            await this.db.insert(schema.checkLogs).values({
+                projectId: projectId,
+                branchName: branchName,
+                status: 'error',
+                commitMessage: error.message || 'Unknown error occurred',
+                commitDate: new Date(),
+                commitAuthor: 'System'
             });
         } catch (logError) {
             console.error('Error logging check error:', logError);
@@ -108,10 +108,10 @@ class ProjectService {
     }
 
     async executeScriptAction(action, branch, commit) {
-        const secrets = await allAsync(this.db, 'SELECT name, value FROM secrets WHERE actionId = ?', [action.id]);
+        const secretsResult = await this.db.select().from(schema.secrets).where(eq(schema.secrets.actionId, action.id));
 
         const envVars = [
-            ...secrets.map(secret => `export ${secret.name}="${secret.value}"`),
+            ...secretsResult.map(secret => `export ${secret.name}="${secret.value}"`),
             `export BRANCH_NAME="${branch.branchName}"`,
             `export COMMIT_SHA="${commit.sha}"`,
             `export COMMIT_MESSAGE="${(commit.commit?.message || '').replace(/"/g, '\\"')}"`,
@@ -136,17 +136,22 @@ class ProjectService {
 
     async executeActions(project, branch, latestCommit) {
         // Get actions with webhook parameters
-        const actions = await this.db.action.findMany({
-            where: { projectId: project.id },
-            include: { webhookParams: true }
-        });
+        const actionsResult = await this.db.select().from(schema.actions)
+            .where(eq(schema.actions.projectId, project.id));
 
-        for (const action of actions) {
+        for (const action of actionsResult) {
             try {
+                // Get webhook parameters for this action
+                const webhookParamsResult = await this.db.select()
+                    .from(schema.webhookParameters)
+                    .where(and(
+                        eq(schema.webhookParameters.actionId, action.id),
+                        eq(schema.webhookParameters.branch, branch.branchName)
+                    ));
+
                 if (action.webhookUrl) {
-                    // Get branch-specific webhook parameters
-                    const webhookParams = action.webhookParams?.filter(param => param.branch === branch.branchName) || [];
-                    const params = webhookParams.reduce((acc, param) => {
+                    // Convert webhook parameters to object format
+                    const params = webhookParamsResult.reduce((acc, param) => {
                         acc[param.name] = param.value;
                         return acc;
                     }, {});
@@ -196,9 +201,8 @@ class ProjectService {
 
         try {
             // Get current branches with their SHA
-            const branches = await this.db.branch.findMany({
-                where: { projectId: project.id }
-            });
+            const branches = await this.db.select().from(schema.branches)
+                .where(eq(schema.branches.projectId, project.id));
 
             if (!branches || branches.length === 0) {
                 console.log(`No branches found for project ${project.name}`);
@@ -235,63 +239,56 @@ class ProjectService {
                     // If this is the first check (lastCommitSha is null), initialize it
                     if (branch.lastCommitSha === null) {
                         console.log(`Initializing SHA for ${project.name}/${branch.branchName} to ${latestCommit.sha}`);
-                        await this.db.branch.update({
-                            where: { id: branch.id },
-                            data: { lastCommitSha: latestCommit.sha }
-                        });
-                        
+                        await this.db.update(schema.branches)
+                            .set({ lastCommitSha: latestCommit.sha })
+                            .where(eq(schema.branches.id, branch.id));
+
                         // Log the initial commit
                         const commitData = latestCommit.commit || {};
                         const commitAuthor = commitData.author || {};
-                        
-                        await this.db.checkLog.create({
-                            data: {
-                                projectId: project.id,
-                                branchName: branch.branchName,
-                                commitSha: latestCommit.sha,
-                                commitMessage: commitData.message || 'Initial commit',
-                                commitAuthor: commitAuthor.name || 'Unknown',
-                                commitDate: commitAuthor.date || new Date().toISOString(),
-                                status: 'initialized'
-                            }
+
+                        await this.db.insert(schema.checkLogs).values({
+                            projectId: project.id,
+                            branchName: branch.branchName,
+                            commitSha: latestCommit.sha,
+                            commitMessage: commitData.message || 'Initial commit',
+                            commitAuthor: commitAuthor.name || 'Unknown',
+                            commitDate: commitAuthor.date ? new Date(commitAuthor.date) : new Date(),
+                            status: 'initialized'
                         });
                         continue;
                     }
 
                     // Compare with the stored SHA
                     const hasChanged = branch.lastCommitSha !== latestCommit.sha;
-                    
+
                     if (hasChanged) {
                         console.log(`Changes detected in ${project.name}/${branch.branchName}`);
                         console.log(`Old SHA: ${branch.lastCommitSha}`);
                         console.log(`New SHA: ${latestCommit.sha}`);
 
                         // Update branch SHA
-                        await this.db.branch.update({
-                            where: { id: branch.id },
-                            data: { lastCommitSha: latestCommit.sha }
-                        });
+                        await this.db.update(schema.branches)
+                            .set({ lastCommitSha: latestCommit.sha })
+                            .where(eq(schema.branches.id, branch.id));
 
                         // Update project timestamp
-                        await this.db.project.update({
-                            where: { id: project.id },
-                            data: { updatedAt: new Date() }
-                        });
+                        await this.db.update(schema.projects)
+                            .set({ updatedAt: new Date() })
+                            .where(eq(schema.projects.id, project.id));
 
                         const commitData = latestCommit.commit || {};
                         const commitAuthor = commitData.author || {};
 
                         // Log the change
-                        await this.db.checkLog.create({
-                            data: {
-                                projectId: project.id,
-                                branchName: branch.branchName,
-                                commitSha: latestCommit.sha,
-                                commitMessage: commitData.message || 'No commit message provided',
-                                commitAuthor: commitAuthor.name || 'Unknown',
-                                commitDate: commitAuthor.date || new Date().toISOString(),
-                                status: 'changed'
-                            }
+                        await this.db.insert(schema.checkLogs).values({
+                            projectId: project.id,
+                            branchName: branch.branchName,
+                            commitSha: latestCommit.sha,
+                            commitMessage: commitData.message || 'No commit message provided',
+                            commitAuthor: commitAuthor.name || 'Unknown',
+                            commitDate: commitAuthor.date ? new Date(commitAuthor.date) : new Date(),
+                            status: 'changed'
                         });
 
                         // Execute actions for the change
@@ -302,16 +299,14 @@ class ProjectService {
                         console.log(`Latest SHA: ${latestCommit.sha}`);
 
                         // Log the check even when no changes
-                        await this.db.checkLog.create({
-                            data: {
-                                projectId: project.id,
-                                branchName: branch.branchName,
-                                commitSha: branch.lastCommitSha,
-                                commitMessage: 'No changes detected',
-                                commitAuthor: 'System',
-                                commitDate: new Date().toISOString(),
-                                status: 'no_change'
-                            }
+                        await this.db.insert(schema.checkLogs).values({
+                            projectId: project.id,
+                            branchName: branch.branchName,
+                            commitSha: branch.lastCommitSha,
+                            commitMessage: 'No changes detected',
+                            commitAuthor: 'System',
+                            commitDate: new Date(),
+                            status: 'no_change'
                         });
                     }
                 } catch (error) {
@@ -334,18 +329,23 @@ class ProjectService {
             let error = null;
 
             // First fetch the complete action with webhook parameters
-            const actionWithParams = await this.db.action.findUnique({
-                where: { id: action.id },
-                include: { webhookParams: true }
-            });
+            const [actionResult] = await this.db.select()
+                .from(schema.actions)
+                .where(eq(schema.actions.id, action.id));
 
-            if (!actionWithParams) {
+            if (!actionResult) {
                 throw new Error('Action not found');
             }
 
             // Get branch-specific webhook parameters
-            const webhookParams = actionWithParams.webhookParams?.filter(param => param.branch === branchName) || [];
-            const params = webhookParams.reduce((acc, param) => {
+            const webhookParamsResult = await this.db.select()
+                .from(schema.webhookParameters)
+                .where(and(
+                    eq(schema.webhookParameters.actionId, action.id),
+                    eq(schema.webhookParameters.branch, branchName)
+                ));
+
+            const params = webhookParamsResult.reduce((acc, param) => {
                 acc[param.name] = param.value;
                 return acc;
             }, {});
@@ -356,8 +356,8 @@ class ProjectService {
                 params
             });
 
-            if (actionWithParams.actionType === 'webhook') {
-                if (!actionWithParams.webhookUrl) {
+            if (actionResult.actionType === 'webhook') {
+                if (!actionResult.webhookUrl) {
                     throw new Error('Webhook URL is required');
                 }
 
@@ -375,19 +375,19 @@ class ProjectService {
                     };
 
                     console.log('Sending webhook with data:', webhookData);
-                    await axios.post(actionWithParams.webhookUrl, webhookData);
+                    await axios.post(actionResult.webhookUrl, webhookData);
                 } catch (err) {
                     throw new Error(`Failed to send webhook: ${err.message}`);
                 }
-            } else if (actionWithParams.actionType === 'script') {
-                if (!actionWithParams.scriptContent) {
+            } else if (actionResult.actionType === 'script') {
+                if (!actionResult.scriptContent) {
                     throw new Error('Script content is required');
                 }
 
                 try {
                     // Create a temporary script file
                     const scriptPath = path.join(os.tmpdir(), `script-${action.id}-${Date.now()}.sh`);
-                    await fs.promises.writeFile(scriptPath, actionWithParams.scriptContent, { mode: 0o755 });
+                    await fs.writeFile(scriptPath, actionResult.scriptContent, { mode: 0o755 });
 
                     // Execute the script with environment variables
                     const env = {
@@ -412,7 +412,7 @@ class ProjectService {
                     });
 
                     // Clean up the temporary script file
-                    await fs.promises.unlink(scriptPath);
+                    await fs.unlink(scriptPath);
                 } catch (err) {
                     throw new Error(`Failed to execute script: ${err.message}`);
                 }
@@ -434,7 +434,7 @@ class ProjectService {
 
     async initializeProjectTimers() {
         try {
-            const projects = await this.db.project.findMany();
+            const projects = await this.db.select().from(schema.projects);
             for (const project of projects) {
                 await this.setupProjectTimer(project);
             }

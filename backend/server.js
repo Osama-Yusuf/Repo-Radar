@@ -5,6 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
 
 const { initializeDatabase } = require('./src/config/database');
+const { pool } = require('./src/config/drizzle');
 const specs = require('./src/config/swagger');
 const ProjectService = require('./src/services/projectService');
 const ProjectController = require('./src/controllers/projectController');
@@ -25,16 +26,16 @@ app.use(bodyParser.json());
 async function initializeApp() {
     try {
         // Initialize database first
-        const prisma = await initializeDatabase();
+        const db = await initializeDatabase();
         console.log('Database initialized successfully');
 
         // Initialize services with database instance
-        const projectService = new ProjectService(prisma);
+        const projectService = new ProjectService(db);
         console.log('Project service initialized');
 
         // Initialize controllers with database instance
-        const projectController = new ProjectController(projectService, prisma);
-        const actionController = new ActionController(prisma);
+        const projectController = new ProjectController(projectService, db);
+        const actionController = new ActionController(db);
         console.log('Controllers initialized');
 
         // Setup routes
@@ -64,7 +65,7 @@ async function initializeApp() {
         // Handle graceful shutdown
         process.on('SIGTERM', async () => {
             console.log('SIGTERM signal received: closing HTTP server');
-            await prisma.$disconnect();
+            await pool.end();
             console.log('Database connection closed');
             process.exit(0);
         });

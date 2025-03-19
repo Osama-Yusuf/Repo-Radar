@@ -1,39 +1,49 @@
-const { runAsync, getAsync, allAsync } = require('../config/database');
+const { eq, desc, and } = require('drizzle-orm');
+const schema = require('../schema/schema');
 
 class ProjectController {
     constructor(projectService, db) {
         this.projectService = projectService;
-        this.db = db;
+        this.db = db
     }
 
     async getAllProjects(req, res) {
         try {
-            const projects = await this.db.project.findMany({
-                include: {
-                    branches: true,
-                    actions: {
-                        include: {
-                            webhookParams: true
-                        }
-                    }
-                }
-            });
+            // Get all projects
+            const projects = await this.db.select().from(schema.projects);
 
-            const projectsWithFormattedData = projects.map(project => ({
-                id: project.id,
-                name: project.name,
-                repo_url: project.repoUrl,
-                check_interval: project.checkInterval,
-                created_at: project.createdAt,
-                updated_at: project.updatedAt,
-                branches: project.branches.map(b => b.branchName),
-                actions: project.actions.map(action => ({
-                    ...action,
-                    webhookParams: action.webhookParams || []
-                }))
+            // For each project, get its branches and actions
+            const projectsWithRelations = await Promise.all(projects.map(async (project) => {
+                const branches = await this.db.select().from(schema.branches)
+                    .where(eq(schema.branches.projectId, project.id));
+
+                const actions = await this.db.select().from(schema.actions)
+                    .where(eq(schema.actions.projectId, project.id));
+
+                // For each action, get its webhook parameters
+                const actionsWithParams = await Promise.all(actions.map(async (action) => {
+                    const webhookParams = await this.db.select().from(schema.webhookParameters)
+                        .where(eq(schema.webhookParameters.actionId, action.id));
+
+                    return {
+                        ...action,
+                        webhookParams: webhookParams || []
+                    };
+                }));
+
+                return {
+                    id: project.id,
+                    name: project.name,
+                    repo_url: project.repoUrl,
+                    check_interval: project.checkInterval,
+                    created_at: project.createdAt,
+                    updated_at: project.updatedAt,
+                    branches: branches.map(b => b.branchName),
+                    actions: actionsWithParams
+                };
             }));
 
-            res.json(projectsWithFormattedData);
+            res.json(projectsWithRelations);
         } catch (err) {
             console.error('Error fetching projects:', err);
             res.status(500).json({ error: err.message });
@@ -44,21 +54,32 @@ class ProjectController {
         const { id } = req.params;
 
         try {
-            const project = await this.db.project.findUnique({
-                where: { id: parseInt(id) },
-                include: {
-                    branches: true,
-                    actions: {
-                        include: {
-                            webhookParams: true
-                        }
-                    }
-                }
-            });
+            // Get the project
+            const [project] = await this.db.select().from(schema.projects)
+                .where(eq(schema.projects.id, parseInt(id)));
 
             if (!project) {
                 return res.status(404).json({ error: 'Project not found' });
             }
+
+            // Get project branches
+            const branches = await this.db.select().from(schema.branches)
+                .where(eq(schema.branches.projectId, project.id));
+
+            // Get project actions
+            const actions = await this.db.select().from(schema.actions)
+                .where(eq(schema.actions.projectId, project.id));
+
+            // For each action, get its webhook parameters
+            const actionsWithParams = await Promise.all(actions.map(async (action) => {
+                const webhookParams = await this.db.select().from(schema.webhookParameters)
+                    .where(eq(schema.webhookParameters.actionId, action.id));
+
+                return {
+                    ...action,
+                    webhookParams: webhookParams || []
+                };
+            }));
 
             const formattedProject = {
                 id: project.id,
@@ -67,11 +88,8 @@ class ProjectController {
                 check_interval: project.checkInterval,
                 created_at: project.createdAt,
                 updated_at: project.updatedAt,
-                branches: project.branches.map(b => b.branchName),
-                actions: project.actions.map(action => ({
-                    ...action,
-                    webhookParams: action.webhookParams || []
-                }))
+                branches: branches.map(b => b.branchName),
+                actions: actionsWithParams
             };
 
             res.json(formattedProject);
@@ -92,23 +110,36 @@ class ProjectController {
         }
 
         try {
-            const project = await this.db.project.create({
-                data: {
+            // Create the project
+            const [projectResult] = await this.db.insert(schema.projects)
+                .values({
                     name,
                     repoUrl,
-                    checkInterval: checkInterval || 5,
-                    branches: {
-                        create: branches.map(branch => ({
-                            branchName: branch.trim()
-                        }))
-                    }
-                },
-                include: {
-                    branches: true
-                }
-            });
+                    checkInterval: checkInterval || 5
+                })
+                .returning();
 
+            // Create branches for the project
+            for (const branch of branches) {
+                await this.db.insert(schema.branches)
+                    .values({
+                        projectId: projectResult.id,
+                        branchName: branch.trim()
+                    });
+            }
+
+            // Get the created branches
+            const createdBranches = await this.db.select()
+                .from(schema.branches)
+                .where(eq(schema.branches.projectId, projectResult.id));
+
+            // Set up project timer
+            const project = {
+                ...projectResult,
+                branches: createdBranches
+            };
             await this.projectService.setupProjectTimer(project);
+
             const formattedProject = {
                 id: project.id,
                 name: project.name,
@@ -116,9 +147,10 @@ class ProjectController {
                 check_interval: project.checkInterval,
                 created_at: project.createdAt,
                 updated_at: project.updatedAt,
-                branches: project.branches.map(b => b.branchName),
+                branches: createdBranches.map(b => b.branchName),
                 actions: []
             };
+
             res.status(201).json(formattedProject);
         } catch (err) {
             console.error('Error creating project:', err);
@@ -140,45 +172,59 @@ class ProjectController {
             // Clear existing timer before update to prevent duplicate timers
             this.projectService.clearTimer(parseInt(id));
 
-            const project = await this.db.project.update({
-                where: { id: parseInt(id) },
-                data: {
+            // Update the project
+            const [updatedProject] = await this.db.update(schema.projects)
+                .set({
                     name,
                     repoUrl: repositoryUrl,
                     checkInterval: interval,
-                    branches: {
-                        deleteMany: {},
-                        create: branches.map(branch => ({
-                            branchName: branch.trim()
-                        }))
-                    }
-                },
-                include: {
-                    branches: true,
-                    actions: true
-                }
-            });
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.projects.id, parseInt(id)))
+                .returning();
 
-            if (!project) {
+            if (!updatedProject) {
                 return res.status(404).json({ error: 'Project not found' });
             }
 
+            // Delete existing branches
+            await this.db.delete(schema.branches)
+                .where(eq(schema.branches.projectId, parseInt(id)));
+
+            // Create new branches
+            for (const branch of branches) {
+                await this.db.insert(schema.branches)
+                    .values({
+                        projectId: parseInt(id),
+                        branchName: branch.trim()
+                    });
+            }
+
+            // Get updated branches
+            const updatedBranches = await this.db.select()
+                .from(schema.branches)
+                .where(eq(schema.branches.projectId, parseInt(id)));
+
+            // Get actions
+            const actions = await this.db.select()
+                .from(schema.actions)
+                .where(eq(schema.actions.projectId, parseInt(id)));
+
             const formattedProject = {
-                id: project.id,
-                name: project.name,
-                repo_url: project.repoUrl,
+                id: updatedProject.id,
+                name: updatedProject.name,
+                repo_url: updatedProject.repoUrl,
                 check_interval: interval,
-                created_at: project.createdAt,
-                updated_at: project.updatedAt,
-                branches: project.branches.map(b => b.branchName),
-                actions: project.actions
+                created_at: updatedProject.createdAt,
+                updated_at: updatedProject.updatedAt,
+                branches: updatedBranches.map(b => b.branchName),
+                actions: actions
             };
 
             // Setup new timer with validated interval
             this.projectService.setupProjectTimer(formattedProject);
             res.json(formattedProject);
         } catch (err) {
-            // Error handling for transaction is managed by Prisma
             console.error('Error updating project:', err);
             res.status(500).json({ error: err.message });
         }
@@ -190,17 +236,18 @@ class ProjectController {
         try {
             this.projectService.clearTimer(parseInt(id));
 
-            const project = await this.db.project.delete({
-                where: { id: parseInt(id) },
-                include: {
-                    branches: true,
-                    actions: true
-                }
-            }).catch(() => null);
+            // Get the project to check if it exists
+            const [project] = await this.db.select()
+                .from(schema.projects)
+                .where(eq(schema.projects.id, parseInt(id)));
 
             if (!project) {
                 return res.status(404).json({ error: 'Project not found' });
             }
+
+            // Delete the project (cascading will delete related records)
+            await this.db.delete(schema.projects)
+                .where(eq(schema.projects.id, parseInt(id)));
 
             res.json({ message: 'Project deleted successfully' });
         } catch (err) {
@@ -213,23 +260,24 @@ class ProjectController {
         const { limit = 50 } = req.query;
 
         try {
-            const logs = await this.db.checkLog.findMany({
-                where: {
-                    projectId: parseInt(projectId)
-                },
-                include: {
-                    project: {
-                        select: {
-                            name: true,
-                            repoUrl: true
-                        }
-                    }
-                },
-                orderBy: {
-                    checkedAt: 'desc'
-                },
-                take: parseInt(limit)
-            });
+            // Get logs for the project, ordered by checked_at desc
+            const logs = await this.db.select({
+                id: schema.checkLogs.id,
+                projectId: schema.checkLogs.projectId,
+                branchName: schema.checkLogs.branchName,
+                commitSha: schema.checkLogs.commitSha,
+                commitMessage: schema.checkLogs.commitMessage,
+                commitAuthor: schema.checkLogs.commitAuthor,
+                commitDate: schema.checkLogs.commitDate,
+                checkedAt: schema.checkLogs.checkedAt,
+                status: schema.checkLogs.status,
+                project: schema.projects
+            })
+                .from(schema.checkLogs)
+                .where(eq(schema.checkLogs.projectId, parseInt(projectId)))
+                .orderBy(desc(schema.checkLogs.checkedAt))
+                .limit(parseInt(limit))
+                .leftJoin(schema.projects, eq(schema.checkLogs.projectId, schema.projects.id));
 
             const formattedLogs = logs.map(log => ({
                 id: log.id,
@@ -263,26 +311,33 @@ class ProjectController {
         }
 
         try {
-            const project = await this.db.project.findUnique({
-                where: { id: parseInt(projectId) },
-                include: {
-                    branches: true,
-                    actions: true
-                }
-            });
+            // Get the project
+            const [project] = await this.db.select()
+                .from(schema.projects)
+                .where(eq(schema.projects.id, parseInt(projectId)));
 
             if (!project) {
                 return res.status(404).json({ error: 'Project not found' });
             }
 
+            // Get branches for the project
+            const branches = await this.db.select()
+                .from(schema.branches)
+                .where(eq(schema.branches.projectId, parseInt(projectId)));
+
             // Verify the branch exists in the project
-            const branchExists = project.branches.some(b => b.branchName === branch);
+            const branchExists = branches.some(b => b.branchName === branch);
             if (!branchExists) {
                 return res.status(400).json({ error: 'Branch not found in project' });
             }
 
+            // Get actions for the project
+            const actions = await this.db.select()
+                .from(schema.actions)
+                .where(eq(schema.actions.projectId, parseInt(projectId)));
+
             // Execute all actions for the project
-            const results = await Promise.allSettled(project.actions.map(async (action) => {
+            const results = await Promise.allSettled(actions.map(async (action) => {
                 try {
                     // Pass isManualTrigger as true for manual action triggers
                     await this.projectService.executeAction(project, action, branch, true);
@@ -343,27 +398,40 @@ class ProjectController {
                 webhookParams
             });
 
-            // Create action with webhook parameters
-            const action = await this.db.action.create({
-                data: {
+            // Create the action
+            const [action] = await this.db.insert(schema.actions)
+                .values({
                     name,
                     actionType,
                     webhookUrl,
                     scriptContent,
-                    projectId: parseInt(projectId),
-                    webhookParams: webhookParams?.length > 0 ? {
-                        createMany: {
-                            data: webhookParams
-                        }
-                    } : undefined
-                },
-                include: {
-                    webhookParams: true
-                }
-            });
+                    projectId: parseInt(projectId)
+                })
+                .returning();
 
-            console.log('Created action:', action);
-            res.json(action);
+            // Create webhook parameters if they exist
+            if (webhookParams?.length > 0) {
+                for (const param of webhookParams) {
+                    await this.db.insert(schema.webhookParameters)
+                        .values({
+                            ...param,
+                            actionId: action.id
+                        });
+                }
+            }
+
+            // Get the created webhook parameters
+            const createdParams = await this.db.select()
+                .from(schema.webhookParameters)
+                .where(eq(schema.webhookParameters.actionId, action.id));
+
+            const actionWithParams = {
+                ...action,
+                webhookParams: createdParams
+            };
+
+            console.log('Created action:', actionWithParams);
+            res.json(actionWithParams);
         } catch (error) {
             console.error('Error creating action:', error);
             res.status(500).json({ error: 'Failed to create action' });
@@ -384,32 +452,45 @@ class ProjectController {
                 webhookParams
             });
 
-            // First delete existing webhook parameters
-            await this.db.webhookParameter.deleteMany({
-                where: { actionId: parseInt(actionId) }
-            });
+            // Delete existing webhook parameters
+            await this.db.delete(schema.webhookParameters)
+                .where(eq(schema.webhookParameters.actionId, parseInt(actionId)));
 
-            // Then update the action with new parameters
-            const action = await this.db.action.update({
-                where: { id: parseInt(actionId) },
-                data: {
+            // Update the action
+            const [updatedAction] = await this.db.update(schema.actions)
+                .set({
                     name,
                     actionType,
                     webhookUrl,
                     scriptContent,
-                    webhookParams: webhookParams?.length > 0 ? {
-                        createMany: {
-                            data: webhookParams
-                        }
-                    } : undefined
-                },
-                include: {
-                    webhookParams: true
-                }
-            });
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.actions.id, parseInt(actionId)))
+                .returning();
 
-            console.log('Updated action:', action);
-            res.json(action);
+            // Create new webhook parameters if they exist
+            if (webhookParams?.length > 0) {
+                for (const param of webhookParams) {
+                    await this.db.insert(schema.webhookParameters)
+                        .values({
+                            ...param,
+                            actionId: parseInt(actionId)
+                        });
+                }
+            }
+
+            // Get the updated webhook parameters
+            const updatedParams = await this.db.select()
+                .from(schema.webhookParameters)
+                .where(eq(schema.webhookParameters.actionId, parseInt(actionId)));
+
+            const actionWithParams = {
+                ...updatedAction,
+                webhookParams: updatedParams
+            };
+
+            console.log('Updated action:', actionWithParams);
+            res.json(actionWithParams);
         } catch (error) {
             console.error('Error updating action:', error);
             res.status(500).json({ error: 'Failed to update action' });
@@ -418,36 +499,45 @@ class ProjectController {
 
     async exportProjects(req, res) {
         try {
-            const projects = await this.db.project.findMany({
-                include: {
-                    branches: true,
-                    actions: {
-                        include: {
-                            webhookParams: true
-                        }
-                    }
-                }
-            });
+            // Get all projects
+            const projects = await this.db.select().from(schema.projects);
 
-            const exportData = projects.map(project => ({
-                name: project.name,
-                repo_url: project.repoUrl,
-                check_interval: project.checkInterval,
-                branches: project.branches.map(b => b.branchName),
-                actions: project.actions.map(action => ({
-                    name: action.name,
-                    actionType: action.actionType,
-                    webhookUrl: action.webhookUrl,
-                    scriptContent: action.scriptContent,
-                    webhookParams: action.webhookParams.map(param => ({
-                        branch: param.branch,
-                        name: param.name,
-                        value: param.value
-                    }))
-                }))
+            // For each project, get its branches and actions
+            const projectsWithRelations = await Promise.all(projects.map(async (project) => {
+                const branches = await this.db.select().from(schema.branches)
+                    .where(eq(schema.branches.projectId, project.id));
+
+                const actions = await this.db.select().from(schema.actions)
+                    .where(eq(schema.actions.projectId, project.id));
+
+                // For each action, get its webhook parameters
+                const actionsWithParams = await Promise.all(actions.map(async (action) => {
+                    const webhookParams = await this.db.select().from(schema.webhookParameters)
+                        .where(eq(schema.webhookParameters.actionId, action.id));
+
+                    return {
+                        name: action.name,
+                        actionType: action.actionType,
+                        webhookUrl: action.webhookUrl,
+                        scriptContent: action.scriptContent,
+                        webhookParams: webhookParams.map(param => ({
+                            branch: param.branch,
+                            name: param.name,
+                            value: param.value
+                        }))
+                    };
+                }));
+
+                return {
+                    name: project.name,
+                    repo_url: project.repoUrl,
+                    check_interval: project.checkInterval,
+                    branches: branches.map(b => b.branchName),
+                    actions: actionsWithParams
+                };
             }));
 
-            res.json(exportData);
+            res.json(projectsWithRelations);
         } catch (error) {
             console.error('Error exporting projects:', error);
             res.status(500).json({ error: 'Failed to export projects' });
@@ -464,34 +554,54 @@ class ProjectController {
         try {
             const results = await Promise.allSettled(projects.map(async (projectData) => {
                 try {
-                    const project = await this.db.project.create({
-                        data: {
+                    // Create the project
+                    const [project] = await this.db.insert(schema.projects)
+                        .values({
                             name: projectData.name,
                             repoUrl: projectData.repo_url,
-                            checkInterval: projectData.check_interval || 5,
-                            branches: {
-                                create: projectData.branches.map(branch => ({
-                                    branchName: branch
-                                }))
-                            },
-                            actions: {
-                                create: projectData.actions?.map(action => ({
-                                    name: action.name,
-                                    actionType: action.actionType,
-                                    webhookUrl: action.webhookUrl,
-                                    scriptContent: action.scriptContent,
-                                    webhookParams: {
-                                        create: action.webhookParams?.map(param => ({
+                            checkInterval: projectData.check_interval || 5
+                        })
+                        .returning();
+
+                    // Create branches for the project
+                    for (const branch of projectData.branches) {
+                        await this.db.insert(schema.branches)
+                            .values({
+                                projectId: project.id,
+                                branchName: branch
+                            });
+                    }
+
+                    // Create actions for the project if they exist
+                    if (projectData.actions && projectData.actions.length > 0) {
+                        for (const actionData of projectData.actions) {
+                            // Create action
+                            const [action] = await this.db.insert(schema.actions)
+                                .values({
+                                    name: actionData.name,
+                                    actionType: actionData.actionType,
+                                    webhookUrl: actionData.webhookUrl,
+                                    scriptContent: actionData.scriptContent,
+                                    projectId: project.id
+                                })
+                                .returning();
+
+                            // Create webhook parameters if they exist
+                            if (actionData.webhookParams && actionData.webhookParams.length > 0) {
+                                for (const param of actionData.webhookParams) {
+                                    await this.db.insert(schema.webhookParameters)
+                                        .values({
                                             branch: param.branch,
                                             name: param.name,
-                                            value: param.value
-                                        }))
-                                    }
-                                })) || []
+                                            value: param.value,
+                                            actionId: action.id
+                                        });
+                                }
                             }
                         }
-                    });
+                    }
 
+                    // Set up project timer
                     await this.projectService.setupProjectTimer(project);
                     return { status: 'success', name: projectData.name };
                 } catch (err) {
