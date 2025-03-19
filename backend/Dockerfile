@@ -24,7 +24,7 @@ RUN pnpm install
 COPY prisma ./prisma/
 
 # Architecture-specific Prisma handling
-RUN if [ "$(uname -m)" = "ppc64le" ]; then \
+RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
       echo "Detected ppc64le architecture - using special Prisma handling"; \
       # Create empty prisma client directory to prevent errors
       mkdir -p node_modules/.prisma/client; \
