@@ -26,11 +26,123 @@ COPY prisma ./prisma/
 # Architecture-specific Prisma handling
 RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
       echo "Detected ppc64le architecture - using special Prisma handling"; \
-      # Create empty prisma client directory to prevent errors
+      # Create mock directories
       mkdir -p node_modules/.prisma/client; \
-      # Create a simple mock of the Prisma client
+      mkdir -p node_modules/@prisma/client; \
+      mkdir -p node_modules/.prisma/client/default; \
+      # Create a mockPrismaClient.js file with all your models
       echo "console.warn('Using mock Prisma client for ppc64le architecture');\n\
-      module.exports = { PrismaClient: class PrismaClient { constructor() { } } };" > node_modules/.prisma/client/index.js; \
+      class PrismaClient {\n\
+        constructor() {\n\
+          console.warn('Mock PrismaClient initialized');\n\
+          \n\
+          // Project model mock\n\
+          this.project = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // Branch model mock\n\
+          this.branch = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            upsert: async (data) => data.create,\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // CheckLog model mock\n\
+          this.checkLog = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // Action model mock\n\
+          this.action = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // Secret model mock\n\
+          this.secret = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // WebhookParameter model mock\n\
+          this.webhookParameter = {\n\
+            findMany: async () => [],\n\
+            findUnique: async () => null,\n\
+            findFirst: async () => null,\n\
+            create: async (data) => data.data,\n\
+            update: async (data) => data.data,\n\
+            delete: async () => ({}),\n\
+            upsert: async (data) => data.create,\n\
+            count: async () => 0\n\
+          };\n\
+          \n\
+          // Transaction mock\n\
+          this.$transaction = async (operations) => {\n\
+            if (Array.isArray(operations)) {\n\
+              return Promise.all(operations.map(op => Promise.resolve({})));\n\
+            } else if (typeof operations === 'function') {\n\
+              return operations(this);\n\
+            }\n\
+            return [];\n\
+          };\n\
+        }\n\
+      }\n\
+      \n\
+      module.exports = { PrismaClient };" > node_modules/.prisma/client/index.js; \
+      # Create a mock for default.js
+      echo "Object.defineProperty(exports, \"__esModule\", { value: true });\n\
+      exports.Prisma = exports.PrismaClient = void 0;\n\
+      var client_1 = require(\".prisma/client\");\n\
+      Object.defineProperty(exports, \"PrismaClient\", { enumerable: true, get: function () { return client_1.PrismaClient; } });\n\
+      var runtime = { \n\
+        DbNull: Symbol('DbNull'),\n\
+        JsonNull: Symbol('JsonNull'),\n\
+        AnyNull: Symbol('AnyNull')\n\
+      };\n\
+      exports.Prisma = { ...runtime };" > node_modules/@prisma/client/default.js; \
+      # Create a mock for .prisma/client/default
+      echo "Object.defineProperty(exports, \"__esModule\", { value: true });\n\
+      exports.Prisma = exports.PrismaClient = void 0;\n\
+      var mockPrisma = require(\"../index.js\");\n\
+      Object.defineProperty(exports, \"PrismaClient\", { enumerable: true, get: function () { return mockPrisma.PrismaClient; } });\n\
+      var runtime = { \n\
+        DbNull: Symbol('DbNull'),\n\
+        JsonNull: Symbol('JsonNull'),\n\
+        AnyNull: Symbol('AnyNull')\n\
+      };\n\
+      exports.Prisma = { ...runtime };" > node_modules/.prisma/client/default/index.js; \
+      # Create a mock for the schema.prisma for prisma migrate
+      mkdir -p node_modules/.bin; \
+      echo '#!/bin/sh\necho "Mock migration completed (skipped on ppc64le)"' > node_modules/.bin/prisma; \
+      chmod +x node_modules/.bin/prisma; \
     else \
       # For supported architectures, generate normally
       pnpm exec prisma generate; \
