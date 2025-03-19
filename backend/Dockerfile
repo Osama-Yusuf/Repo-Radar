@@ -35,6 +35,7 @@ RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
       class PrismaClient {\n\
         constructor() {\n\
           console.warn('Mock PrismaClient initialized');\n\
+          this._middlewares = [];\n\
           \n\
           // Project model mock\n\
           this.project = {\n\
@@ -113,6 +114,13 @@ RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
             }\n\
             return [];\n\
           };\n\
+        }\n\
+        \n\
+        // Add $use method for middleware support\n\
+        \$use(middleware) {\n\
+          console.log('Added mock middleware');\n\
+          this._middlewares.push(middleware);\n\
+          return this;\n\
         }\n\
       }\n\
       \n\
