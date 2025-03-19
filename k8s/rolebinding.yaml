@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: repo-radar-cluster-pods-reader-binding
+subjects:
+- kind: ServiceAccount
+  name: repo-radar-backend-sa
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: repo-radar-cluster-pods-reader
+  apiGroup: rbac.authorization.k8s.io
