@@ -36,6 +36,7 @@ RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
         constructor() {\n\
           console.warn('Mock PrismaClient initialized');\n\
           this._middlewares = [];\n\
+          this._connected = false;\n\
           \n\
           // Project model mock\n\
           this.project = {\n\
@@ -121,6 +122,20 @@ RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
           console.log('Added mock middleware');\n\
           this._middlewares.push(middleware);\n\
           return this;\n\
+        }\n\
+        \n\
+        // Add $connect method\n\
+        \$connect() {\n\
+          console.log('Mock connected to database');\n\
+          this._connected = true;\n\
+          return Promise.resolve();\n\
+        }\n\
+        \n\
+        // Add $disconnect method\n\
+        \$disconnect() {\n\
+          console.log('Mock disconnected from database');\n\
+          this._connected = false;\n\
+          return Promise.resolve();\n\
         }\n\
       }\n\
       \n\
