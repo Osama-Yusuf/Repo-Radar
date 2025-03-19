@@ -105,7 +105,7 @@ RUN if [ "$(uname -m)" = "ppc64" ] || [ "$(uname -m)" = "ppc64le" ]; then \
           };\n\
           \n\
           // Transaction mock\n\
-          this.$transaction = async (operations) => {\n\
+          this.\$transaction = async (operations) => {\n\
             if (Array.isArray(operations)) {\n\
               return Promise.all(operations.map(op => Promise.resolve({})));\n\
             } else if (typeof operations === 'function') {\n\
