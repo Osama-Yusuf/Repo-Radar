@@ -4,8 +4,8 @@ metadata:
   name: repo-radar-cluster-pods-reader
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
+  resources: ["pods", "pods/log"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["tekton.dev"]
-  resources: ["pipelineruns"]
+  resources: ["pipelineruns", "taskruns", "tasks"]
   verbs: ["get", "list", "watch"]
