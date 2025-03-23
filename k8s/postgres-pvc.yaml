@@ -9,5 +9,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
+  storageClassName: ibm-spectrum-scale-sample
   volumeMode: Filesystem
 

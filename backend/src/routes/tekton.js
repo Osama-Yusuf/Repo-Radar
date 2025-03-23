@@ -50,14 +50,18 @@ router.get('/pipelineruns', async (req, res) => {
           duration: formatDuration(ref.startTime, ref.completionTime)
         }));
       } else if (status.taskRuns) {
-        tasks = Object.entries(status.taskRuns).map(([key, task]) => ({
-          name: key,
-          pipelineTaskName: task.pipelineTaskName,
-          status: task.status?.conditions?.[0]?.reason || 'Unknown',
-          startTime: task.status?.startTime,
-          completionTime: task.status?.completionTime,
-          duration: formatDuration(task.status?.startTime, task.status?.completionTime)
-        }));
+        tasks = Object.entries(status.taskRuns).map(([key, task]) => {
+          const startTime = task.status?.startTime;
+          const completionTime = task.status?.completionTime;
+          return {
+            name: key,
+            pipelineTaskName: task.pipelineTaskName,
+            status: task.status?.conditions?.[0]?.reason || 'Unknown',
+            startTime: startTime,
+            completionTime: completionTime,
+            duration: formatDuration(startTime, completionTime)
+          };
+        });
       }
       
       return {

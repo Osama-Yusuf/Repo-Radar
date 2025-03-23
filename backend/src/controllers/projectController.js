@@ -132,11 +132,15 @@ class ProjectController {
             const createdBranches = await this.db.select()
                 .from(schema.branches)
                 .where(eq(schema.branches.projectId, projectResult.id));
+            
+            console.log('Created branches type:', typeof createdBranches);
+            console.log('Created branches isArray:', Array.isArray(createdBranches));
+            console.log('Created branches value:', JSON.stringify(createdBranches, null, 2));
 
             // Set up project timer
             const project = {
                 ...projectResult,
-                branches: createdBranches
+                branches: Array.isArray(createdBranches) ? createdBranches : []
             };
             await this.projectService.setupProjectTimer(project);
 
@@ -147,7 +151,7 @@ class ProjectController {
                 check_interval: project.checkInterval,
                 created_at: project.createdAt,
                 updated_at: project.updatedAt,
-                branches: createdBranches.map(b => b.branchName),
+                branches: Array.isArray(createdBranches) ? createdBranches.map(b => b.branchName) : [],
                 actions: []
             };
 

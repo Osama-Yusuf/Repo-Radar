@@ -90,10 +90,18 @@ const PipelineStatus = () => {
             : statusA - statusB;
         case 'duration':
           const getDurationInSeconds = (pipeline) => {
-            if (!pipeline.startTime) return 0;
-            const start = new Date(pipeline.startTime);
-            const end = pipeline.completionTime ? new Date(pipeline.completionTime) : new Date();
-            return (end - start) / 1000;
+            if (!pipeline.duration) return 0;
+            const durationMatch = pipeline.duration.match(/(\d+)([smhd])/);
+            if (!durationMatch) return 0;
+            
+            const [, value, unit] = durationMatch;
+            switch(unit) {
+              case 's': return parseInt(value);
+              case 'm': return parseInt(value) * 60;
+              case 'h': return parseInt(value) * 3600;
+              case 'd': return parseInt(value) * 86400;
+              default: return 0;
+            }
           };
           const durationA = getDurationInSeconds(a);
           const durationB = getDurationInSeconds(b);
@@ -397,7 +405,7 @@ const PipelineStatus = () => {
                         }}
                       >
                         <TimerIcon sx={{ fontSize: '1rem' }} />
-                        Duration: {pipeline.duration}
+                        Duration: {pipeline.duration && pipeline.duration !== '0s' ? pipeline.duration : pipeline.status === 'Running' ? 'In Progress' : 'N/A'}
                       </Typography>
                     </Box>
                     {pipeline.message && (
@@ -555,7 +563,7 @@ const PipelineStatus = () => {
                         fontWeight: 500
                       }}
                     >
-                      {pipeline.duration}
+                      {pipeline.duration && pipeline.duration !== '0s' ? pipeline.duration : pipeline.status === 'Running' ? 'In Progress' : 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
@@ -570,7 +578,7 @@ const PipelineStatus = () => {
                       Tasks
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {pipeline.tasks.map((task) => {
+                      {[...pipeline.tasks].reverse().map((task, index) => {
                         const taskStatus = getPipelineStatus(task.status);
                         return (
                           <Box
@@ -579,35 +587,55 @@ const PipelineStatus = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              p: 1,
-                              borderRadius: '4px',
-                              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              p: 1.5,
+                              borderRadius: '8px',
+                              backgroundColor: taskStatus.bgColor,
+                              border: `1px solid ${taskStatus.borderColor}`,
+                              transition: 'all 0.2s ease-in-out',
                               '&:hover': {
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                transform: 'translateX(4px)',
+                                backgroundColor: `${taskStatus.bgColor}`,
+                                boxShadow: `0 4px 12px ${taskStatus.borderColor}`,
+                                borderColor: taskStatus.color
                               }
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Typography
+                                variant="body2"
                                 sx={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: '50%',
-                                  backgroundColor: taskStatus.color
+                                  color: taskStatus.color,
+                                  minWidth: '24px',
+                                  fontWeight: 600,
+                                  fontSize: '0.9rem'
                                 }}
-                              />
+                              >
+                                {pipeline.tasks.length - index}.
+                              </Typography>
                               <Typography
                                 variant="body2"
                                 sx={{
                                   color: '#fff',
-                                  fontSize: '0.8rem'
+                                  fontWeight: 500,
+                                  fontSize: '0.9rem'
                                 }}
                               >
-                                {task.name}
+                                {task.pipelineTaskName || task.name}
                               </Typography>
                             </Box>
-                            <Tooltip title="View Logs">
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: 'rgba(255, 255, 255, 0.6)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5
+                                }}
+                              >
+                                <TimerIcon sx={{ fontSize: '0.9rem' }} />
+                                {task.duration || '0s'}
+                              </Typography>
                               <IconButton
                                 size="small"
                                 onClick={() => handleOpenLogs(pipeline, task)}
@@ -621,7 +649,7 @@ const PipelineStatus = () => {
                               >
                                 <LogsIcon fontSize="small" />
                               </IconButton>
-                            </Tooltip>
+                            </Box>
                           </Box>
                         );
                       })}
