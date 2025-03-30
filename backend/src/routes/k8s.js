@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const k8s = require('@kubernetes/client-node');
-const { exec } = require('child_process');
 const util = require('util');
-const execPromise = util.promisify(exec);
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+const metricsApi = kc.makeApiClient(k8s.CustomObjectsApi);
 
 // Helper function to format pod age
 function formatAge(timestamp) {
@@ -21,23 +20,79 @@ function formatAge(timestamp) {
   return `${Math.floor(diffInSeconds / 86400)}d`;
 };
 
+// Helper functions to convert metrics units
+function convertCpuToMillicores(cpuString) {
+  if (!cpuString) return '0m';
+  
+  // If already in millicores format, return as is
+  if (cpuString.endsWith('m')) return cpuString;
+  
+  // Convert from nanocores (n) to millicores (m)
+  if (cpuString.endsWith('n')) {
+    const nanocores = parseInt(cpuString.replace('n', ''), 10);
+    const millicores = Math.round(nanocores / 1000000); // 1m = 1,000,000n
+    return `${millicores}m`;
+  }
+  
+  // Handle core value (no suffix)
+  const cores = parseFloat(cpuString);
+  return `${Math.round(cores * 1000)}m`;
+}
+
+function convertMemoryToMi(memString) {
+  if (!memString) return '0Mi';
+  
+  // If already in Mi format, return as is
+  if (memString.endsWith('Mi')) return memString;
+  
+  // Convert from Ki to Mi
+  if (memString.endsWith('Ki')) {
+    const ki = parseInt(memString.replace('Ki', ''), 10);
+    const mi = Math.round(ki / 1024);
+    return `${mi}Mi`;
+  }
+  
+  // Handle other formats
+  if (memString.endsWith('Gi')) {
+    const gi = parseFloat(memString.replace('Gi', ''));
+    return `${Math.round(gi * 1024)}Mi`;
+  }
+  
+  // Default case - assume bytes and convert to Mi
+  const bytes = parseInt(memString, 10);
+  const mi = Math.round(bytes / (1024 * 1024));
+  return `${mi}Mi`;
+}
+
 async function getPodMetrics() {
   try {
-    const { stdout } = await execPromise('kubectl top pods --namespace default --containers');
-    const lines = stdout.trim().split('\n').slice(1); // Skip header
     const metrics = new Map();
-
-    lines.forEach(line => {
-      const [pod, container, cpu, memory] = line.split(/\s+/);
-      if (!metrics.has(pod)) {
-        metrics.set(pod, {});
-      }
-      metrics.get(pod)[container] = {
-        cpu,
-        memory
-      };
-    });
-
+    const metricsResponse = await metricsApi.getNamespacedCustomObject(
+      'metrics.k8s.io',
+      'v1beta1',
+      'default',
+      'pods',
+      ''
+    );
+    
+    if (metricsResponse.body && metricsResponse.body.items) {
+      metricsResponse.body.items.forEach(podMetric => {
+        const podName = podMetric.metadata.name;
+        const containers = {};
+        
+        if (podMetric.containers) {
+          podMetric.containers.forEach(container => {
+            containers[container.name] = {
+              cpu: convertCpuToMillicores(container.usage.cpu),
+              memory: convertMemoryToMi(container.usage.memory)
+            };
+          });
+        }
+        
+        metrics.set(podName, containers);
+      });
+    }
+    
     return metrics;
   } catch (error) {
     console.error('Error getting pod metrics:', error);
