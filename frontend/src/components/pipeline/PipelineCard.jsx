@@ -1,9 +1,9 @@
 import React from 'react';
 import {
-  Box, 
-  Typography, 
-  Grid, 
-  Paper, 
+  Box,
+  Typography,
+  Grid,
+  Paper,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -162,6 +162,28 @@ const PipelineCard = ({ pipeline, onOpenTaskLogs, onOpenPipelineLogs }) => {
           </Box>
         </Box>
       </Box>
+      <Grid item xs={12}>
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'rgba(255, 255, 255, 0.5)',
+            display: 'block',
+            mb: 0.5
+          }}
+        >
+          Pipeline
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            color: '#fff',
+            fontWeight: 500,
+            mb: 3
+          }}
+        >
+          {pipeline.pipeline}
+        </Typography>
+      </Grid>
 
       {pipeline.params && pipeline.params.length > 0 && (
         <Box sx={{ mb: 2.5 }}>
@@ -222,50 +244,7 @@ const PipelineCard = ({ pipeline, onOpenTaskLogs, onOpenPipelineLogs }) => {
           </Box>
         </Box>
       )}
-
-      <Grid container spacing={2}>
-        <Grid item xs={6}>
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              display: 'block',
-              mb: 0.5
-            }}
-          >
-            Pipeline
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: '#fff',
-              fontWeight: 500
-            }}
-          >
-            {pipeline.pipeline}
-          </Typography>
-        </Grid>
-        <Grid item xs={6}>
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              display: 'block',
-              mb: 0.5
-            }}
-          >
-            Duration
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: '#fff',
-              fontWeight: 500
-            }}
-          >
-            {pipeline.duration && pipeline.duration !== '0s' ? pipeline.duration : pipeline.status === 'Running' ? 'In Progress' : 'N/A'}
-          </Typography>
-        </Grid>
+      <Grid container spacing={3}>
         <Grid item xs={12}>
           <PipelineTaskList
             tasks={pipeline.tasks}

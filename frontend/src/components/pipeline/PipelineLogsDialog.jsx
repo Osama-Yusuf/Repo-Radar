@@ -11,13 +11,16 @@ import {
 } from '@mui/material';
 
 const PipelineLogsDialog = ({ pipelineLogs, pipelineLogsLoading, onClose }) => {
-  if (!pipelineLogs) {
+  // Dialog should open even if logs are still loading (pipelineLogs exists but might be empty)
+  const isOpen = pipelineLogs !== null;
+  
+  if (!isOpen) {
     return null;
   }
 
   return (
     <Dialog
-      open={!!pipelineLogs}
+      open={isOpen}
       onClose={onClose}
       maxWidth="lg"
       fullWidth
@@ -30,12 +33,15 @@ const PipelineLogsDialog = ({ pipelineLogs, pipelineLogsLoading, onClose }) => {
       }}
     >
       <DialogTitle sx={{ color: '#fff' }}>
-        {pipelineLogs ? `Pipeline Logs: ${pipelineLogs.pipeline.name}` : ''}
+        {pipelineLogs ? `Pipeline Logs: ${pipelineLogs.pipeline.name}` : 'Pipeline Logs'}
       </DialogTitle>
       <DialogContent>
         {pipelineLogsLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-            <CircularProgress />
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
+            <CircularProgress size={40} sx={{ mb: 2 }} />
+            <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+              Loading pipeline logs...
+            </Typography>
           </Box>
         ) : pipelineLogs?.error ? (
           <Typography color="error" sx={{ p: 2 }}>

@@ -64,7 +64,6 @@ const PipelineStatus = () => {
   };
 
   const fetchPipelineLogs = async (pipeline) => {
-    setPipelineLogsLoading(true);
     try {
       const response = await apiClient.get(`/tekton/pipelineruns/${pipeline.name}/logs`);
       setPipelineLogs({
@@ -88,6 +87,11 @@ const PipelineStatus = () => {
   };
 
   const handleOpenPipelineLogs = async (pipeline) => {
+    // First set loading state and open dialog immediately
+    setPipelineLogsLoading(true);
+    setPipelineLogs({ pipeline, logs: {} }); // Initialize with empty logs
+    
+    // Then fetch the actual logs
     await fetchPipelineLogs(pipeline);
   };
 

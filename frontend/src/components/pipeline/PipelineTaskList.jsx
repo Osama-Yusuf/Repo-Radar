@@ -19,7 +19,31 @@ const PipelineTaskList = ({ tasks, pipeline, onOpenTaskLogs }) => {
       >
         Tasks
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: 1,
+        maxHeight: '220px',
+        overflowY: 'auto',
+        pr: 1,
+        mr: -1,
+        '&::-webkit-scrollbar': {
+          width: '6px',
+          background: 'transparent',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          background: 'rgba(255, 255, 255, 0.15)',
+          borderRadius: '6px',
+          '&:hover': {
+            background: 'rgba(255, 255, 255, 0.3)',
+          },
+        },
+        '&::-webkit-scrollbar-track': {
+          background: 'rgba(0, 0, 0, 0.1)',
+          borderRadius: '6px',
+        },
+        maskImage: 'linear-gradient(to bottom, black 95%, transparent 100%)',
+      }}>
         {[...tasks].reverse().map((task, index) => {
           const taskStatus = getPipelineStatus(task.status);
           return (
