@@ -24,6 +24,7 @@ const PipelineCard = ({ pipeline, onOpenTaskLogs, onOpenPipelineLogs }) => {
       p: 2.5,
       height: '100%',
       background: 'rgba(255, 255, 255, 0.03)',
+      width: '90%',
       backdropFilter: 'blur(10px)',
       borderRadius: '16px',
       border: `1px solid ${statusInfo.borderColor}`,

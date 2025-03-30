@@ -4,7 +4,8 @@ import {
   Grid,
   Box,
   Typography,
-  CircularProgress
+  CircularProgress,
+  Paper
 } from '@mui/material';
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
@@ -15,6 +16,7 @@ import {
   PipelineSortSelect,
   sortPipelines
 } from '../components/pipeline';
+import { LinearScaleTwoTone as PipelineIcon } from '@mui/icons-material';
 
 // Define the API base URL in the same way as App.jsx
 const PORT = import.meta.env.VITE_PORT || '3001';
@@ -144,6 +146,9 @@ const PipelineStatus = () => {
     );
   }
 
+  const sortedPipelines = sortPipelines(filteredPipelines, sortOption);
+  const hasPipelines = sortedPipelines.length > 0;
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -153,17 +158,83 @@ const PipelineStatus = () => {
         <PipelineSortSelect sortOption={sortOption} setSortOption={setSortOption} />
       </Box>
 
-      <Grid container spacing={3}>
-        {sortPipelines(filteredPipelines, sortOption).map((pipeline) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={pipeline.name}>
-            <PipelineCard
-              pipeline={pipeline}
-              onOpenTaskLogs={handleOpenLogs}
-              onOpenPipelineLogs={handleOpenPipelineLogs}
-            />
-          </Grid>
-        ))}
-      </Grid>
+      {hasPipelines ? (
+        <Grid container spacing={3}>
+          {sortedPipelines.map((pipeline) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={pipeline.name}>
+              <PipelineCard
+                pipeline={pipeline}
+                onOpenTaskLogs={handleOpenLogs}
+                onOpenPipelineLogs={handleOpenPipelineLogs}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      ) : (
+        <Paper
+          sx={{
+            p: 5,
+            borderRadius: '16px',
+            textAlign: 'center',
+            background: 'rgba(255, 255, 255, 0.03)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            mt: 4
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 5
+            }}
+          >
+            <Box
+              sx={{
+                width: 120,
+                height: 120,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(25, 118, 210, 0.1)',
+                mb: 3
+              }}
+            >
+              <PipelineIcon
+                sx={{
+                  fontSize: 64,
+                  color: 'rgba(25, 118, 210, 0.8)'
+                }}
+              />
+            </Box>
+            <Typography
+              variant="h5"
+              sx={{
+                color: '#fff',
+                fontWeight: 500,
+                mb: 2
+              }}
+            >
+              No Pipelines Found
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                maxWidth: 500,
+                mb: 2
+              }}
+            >
+              {searchQuery
+                ? "No pipelines match your search criteria. Try adjusting your search terms."
+                : "There are no active pipelines at the moment. New pipelines will appear here when they're created."}
+            </Typography>
+          </Box>
+        </Paper>
+      )}
 
       <PipelineLogsDialog
         pipelineLogs={pipelineLogs}
