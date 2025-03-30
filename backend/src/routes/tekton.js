@@ -11,21 +11,54 @@ const coreV1Api = kc.makeApiClient(k8s.CoreV1Api);
 
 // Helper function to format duration
 const formatDuration = (startTime, completionTime) => {
-  if (!startTime) return '0s';
+  // Debug the timestamp values
+  // console.log(`Duration calculation - startTime: ${startTime}, completionTime: ${completionTime}`);
   
-  const start = new Date(startTime);
-  const end = completionTime ? new Date(completionTime) : new Date();
-  const diffInSeconds = Math.floor((end - start) / 1000);
+  if (!startTime) {
+    // console.log('No startTime provided, returning 0s');
+    return '0s';
+  }
+  
+  try {
+    const start = new Date(startTime);
+    // Use current time if completionTime is null (for running tasks)
+    const end = completionTime ? new Date(completionTime) : new Date();
+    
+    // console.log(`Parsed dates - start: ${start.toISOString()}, end: ${end.toISOString()}`);
+    
+    // Ensure both dates are valid
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      // console.log('Invalid date conversion, returning 0s');
+      return '0s';
+    }
+    
+    // Calculate difference in milliseconds then convert to seconds
+    const diffInMilliseconds = end - start;
+    const diffInSeconds = Math.floor(diffInMilliseconds / 1000);
+    
+    // console.log(`Time difference: ${diffInMilliseconds}ms (${diffInSeconds}s)`);
+    
+    // Return at least 1s for very quick tasks to avoid showing 0s
+    if (diffInSeconds <= 0) {
+      // console.log('Time difference is zero or negative, returning 1s');
+      return '1s';
+    }
 
-  if (diffInSeconds < 60) return `${diffInSeconds}s`;
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-  return `${Math.floor(diffInSeconds / 86400)}d`;
+    // Format the duration
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}d`;
+  } catch (error) {
+    console.error('Error calculating duration:', error);
+    return '0s';
+  }
 };
 
 // Get pipeline runs in devops namespace
 router.get('/pipelineruns', async (req, res) => {
   try {
+    // Fetch pipeline runs
     const response = await k8sApi.listNamespacedCustomObject(
       'tekton.dev',
       'v1beta1',
@@ -33,33 +66,89 @@ router.get('/pipelineruns', async (req, res) => {
       'pipelineruns'
     );
 
+    // Fetch all task runs for matching
+    const taskRunsResponse = await k8sApi.listNamespacedCustomObject(
+      'tekton.dev',
+      'v1beta1',
+      'devops',
+      'taskruns'
+    );
+    
+    // Create a map of task runs for easy lookup
+    const taskRunsMap = {};
+    if (taskRunsResponse.body && taskRunsResponse.body.items) {
+      taskRunsResponse.body.items.forEach(tr => {
+        taskRunsMap[tr.metadata.name] = tr;
+      });
+    }
+
     const pipelineRuns = (response.body.items || []).map(run => {
       const status = run.status || {};
       const conditions = status.conditions || [];
       const latestCondition = conditions[conditions.length - 1] || {};
       
+      // console.log(`Pipeline: ${run.metadata.name}`);
+      
       // Extract tasks from childReferences or taskRuns
       let tasks = [];
       if (status.childReferences) {
-        tasks = status.childReferences.map(ref => ({
-          name: ref.name,
-          pipelineTaskName: ref.pipelineTaskName,
-          status: ref.status || 'Unknown',
-          startTime: ref.startTime,
-          completionTime: ref.completionTime,
-          duration: formatDuration(ref.startTime, ref.completionTime)
-        }));
+        tasks = status.childReferences.map(ref => {
+          // console.log(`Task ref: ${ref.name}`);
+          
+          // Look up the actual TaskRun for timing data
+          const taskRun = taskRunsMap[ref.name];
+          let taskStartTime = null;
+          let taskCompletionTime = null;
+          
+          if (taskRun) {
+            // console.log(`Found TaskRun details for: ${ref.name}`);
+            taskStartTime = taskRun.status?.startTime || null;
+            taskCompletionTime = taskRun.status?.completionTime || null;
+            
+            // console.log(`TaskRun ${ref.name} time details - Start: ${taskStartTime}, Completion: ${taskCompletionTime}`);
+          }
+          
+          return {
+            name: ref.name,
+            pipelineTaskName: ref.pipelineTaskName,
+            status: taskRun?.status?.conditions?.[0]?.reason || ref.status || 'Unknown',
+            startTime: taskStartTime,
+            completionTime: taskCompletionTime,
+            duration: formatDuration(taskStartTime, taskCompletionTime)
+          };
+        });
       } else if (status.taskRuns) {
+        // console.log(`Using taskRuns property - structure: ${JSON.stringify(Object.keys(status.taskRuns))}`);
+        
         tasks = Object.entries(status.taskRuns).map(([key, task]) => {
-          const startTime = task.status?.startTime;
-          const completionTime = task.status?.completionTime;
+          // Access deeper into the nested structure to ensure we get timestamps
+          const taskStatus = task.status || {};
+          
+          // Check if we need to go deeper for the timestamps
+          let taskStartTime = null;
+          let taskCompletionTime = null;
+          
+          if (taskStatus.startTime) {
+            taskStartTime = taskStatus.startTime;
+          } else if (task.startTime) {
+            taskStartTime = task.startTime;
+          }
+          
+          if (taskStatus.completionTime) {
+            taskCompletionTime = taskStatus.completionTime;
+          } else if (task.completionTime) {
+            taskCompletionTime = task.completionTime;
+          }
+          
+          // console.log(`Task: ${key}, StartTime: ${taskStartTime}, CompletionTime: ${taskCompletionTime}`);
+          
           return {
             name: key,
             pipelineTaskName: task.pipelineTaskName,
-            status: task.status?.conditions?.[0]?.reason || 'Unknown',
-            startTime: startTime,
-            completionTime: completionTime,
-            duration: formatDuration(startTime, completionTime)
+            status: taskStatus.conditions?.[0]?.reason || 'Unknown',
+            startTime: taskStartTime,
+            completionTime: taskCompletionTime,
+            duration: formatDuration(taskStartTime, taskCompletionTime)
           };
         });
       }
