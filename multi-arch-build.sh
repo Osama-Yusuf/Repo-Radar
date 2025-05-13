@@ -3,7 +3,7 @@
 
 # Set your DockerHub username and image name
 DOCKER_USERNAME="osamayusuf"
-DOCKER_PASSWORD="147896325@Osama"
+DOCKER_PASSWORD=""
 IMAGE_NAME="repo-radar_frontend"
 TAG="k8s-3"
 # Set architectures - default includes ppc64le, but can be overridden
