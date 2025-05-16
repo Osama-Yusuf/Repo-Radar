@@ -66,11 +66,21 @@ const webhookParameters = pgTable('webhook_parameters', {
     };
 });
 
+// User table for authentication
+const users = pgTable('users', {
+    id: serial('id').primaryKey(),
+    username: varchar('username', { length: 50 }).notNull().unique(),
+    password: text('password').notNull(), // Will store hashed passwords
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
 module.exports = {
     projects,
     branches,
     checkLogs,
     actions,
     secrets,
-    webhookParameters
+    webhookParameters,
+    users
 };

@@ -9,19 +9,22 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push:pg",
-    "db:drop": "drizzle-kit drop"
+    "db:drop": "drizzle-kit drop",
+    "setup:auth": "node setup-auth.js"
   },
   "dependencies": {
     "@kubernetes/client-node": "^0.20.0",
     "@octokit/rest": "^20.0.2",
     "@types/pg": "^8.11.11",
     "axios": "^1.6.2",
+    "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "drizzle-kit": "^0.30.5",
     "drizzle-orm": "^0.40.1",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pg": "^8.14.1",
     "sqlite3": "^5.1.6",

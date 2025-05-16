@@ -10,8 +10,10 @@ const specs = require('./src/config/swagger');
 const ProjectService = require('./src/services/projectService');
 const ProjectController = require('./src/controllers/projectController');
 const ActionController = require('./src/controllers/actionController');
+const AuthController = require('./src/controllers/authController');
 const setupProjectRoutes = require('./src/routes/projectRoutes');
 const setupActionRoutes = require('./src/routes/actionRoutes');
+const setupAuthRoutes = require('./src/routes/authRoutes');
 const k8sRoutes = require('./src/routes/k8s');
 const tektonRoutes = require('./src/routes/tekton');
 
@@ -36,16 +38,19 @@ async function initializeApp() {
         // Initialize controllers with database instance
         const projectController = new ProjectController(projectService, db);
         const actionController = new ActionController(db);
+        const authController = new AuthController(db);
         console.log('Controllers initialized');
 
         // Setup routes
         const projectRouter = setupProjectRoutes(projectController);
         const actionRouter = setupActionRoutes(actionController);
+        const authRouter = setupAuthRoutes(authController);
         console.log('Routes initialized');
 
         // API routes
         app.use('/api/projects', projectRouter);
         app.use('/api', actionRouter);
+        app.use('/api/auth', authRouter);
         app.use('/api/k8s', k8sRoutes);
         app.use('/api/tekton', tektonRoutes);
 

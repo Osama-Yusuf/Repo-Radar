@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AppBar, Toolbar, Typography, Box, IconButton, Button, InputBase, Tooltip } from '@mui/material';
-import { GitHub as GitHubIcon, Add as AddIcon, Search as SearchIcon, FileUpload as ImportIcon, FileDownload as ExportIcon } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Box, IconButton, Button, InputBase, Tooltip, Menu, MenuItem, Avatar } from '@mui/material';
+import { GitHub as GitHubIcon, Add as AddIcon, Search as SearchIcon, FileUpload as ImportIcon, FileDownload as ExportIcon, AccountCircle } from '@mui/icons-material';
 import { useSearch } from '../../contexts/SearchContext';
+import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
@@ -9,7 +10,9 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:
 
 const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
   const { handleSearch } = useSearch();
+  const { currentUser, logout } = useAuth();
   const [importInput, setImportInput] = useState(null);
+  const [anchorEl, setAnchorEl] = useState(null);
 
   const handleExport = async () => {
     try {
@@ -44,6 +47,19 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
     };
     reader.readAsText(file);
     event.target.value = null; // Reset input
+  };
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    handleMenuClose();
   };
 
   return (
@@ -97,7 +113,7 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
             onChange={handleImport}
             ref={input => setImportInput(input)}
           />
-          
+
           <Tooltip title="Import Projects">
             <IconButton
               onClick={() => importInput?.click()}
@@ -138,6 +154,69 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
           >
             Add Project
           </Button>
+
+          {currentUser && (
+            <>
+              <Tooltip title="Account">
+                <IconButton
+                  onClick={handleMenuOpen}
+                  sx={{
+                    ml: 1,
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    '&:hover': { color: '#fff' }
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      bgcolor: '#2196f3',
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {currentUser.username.charAt(0).toUpperCase()}
+                  </Avatar>
+                </IconButton>
+              </Tooltip>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                PaperProps={{
+                  sx: {
+                    backgroundColor: '#1E213A',
+                    color: '#fff',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                    border: '1px solid #2D325A',
+                    mt: 1
+                  }
+                }}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              >
+                <MenuItem sx={{
+                  fontSize: '0.9rem',
+                  py: 1,
+                  '&:hover': { backgroundColor: 'rgba(33, 150, 243, 0.1)' }
+                }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Signed in as <strong>{currentUser.username}</strong>
+                  </Typography>
+                </MenuItem>
+                <MenuItem
+                  onClick={handleLogout}
+                  sx={{
+                    fontSize: '0.9rem',
+                    py: 1,
+                    '&:hover': { backgroundColor: 'rgba(33, 150, 243, 0.1)' }
+                  }}
+                >
+                  Logout
+                </MenuItem>
+              </Menu>
+            </>
+          )}
         </Box>
       </Toolbar>
     </AppBar>

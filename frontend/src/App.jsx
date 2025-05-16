@@ -11,13 +11,16 @@ import ProjectCard from './components/projects/ProjectCard';
 import ProjectDialog from './components/projects/ProjectDialog';
 import ActionDialog from './components/actions/ActionDialog';
 import LogsDialog from './components/logs/LogsDialog';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Pages
 import PodStatus from './pages/PodStatus';
 import PipelineStatus from './pages/PipelineStatus';
+import AuthPage from './pages/AuthPage';
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
@@ -606,45 +609,80 @@ function App() {
   };
 
   return (
-    <SearchProvider>
-      <Router>
-        <div className="App" style={{
-          minHeight: '100vh',
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-          color: '#fff',
-          display: 'flex'
-        }}>
-          <SideNav />
-          <Box sx={{ flex: 1, ml: '80px' }}>
-            <Header
-              onRefresh={() => fetchProjects(true)}
-              onAddProject={() => handleOpenDialog()}
-              isRefreshing={refreshing}
-            />
-
+    <AuthProvider>
+      <SearchProvider>
+        <Router>
+          <div className="App" style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            color: '#fff',
+            display: 'flex'
+          }}>
             <Routes>
-              <Route
-                path="/"
-                element={
-                  <RepositoriesPage
-                    projects={projects}
-                    loading={loading}
-                    error={error}
-                    handleOpenLogs={handleOpenLogs}
-                    handleOpenActionDialog={handleOpenActionDialog}
-                    handleOpenDialog={handleOpenDialog}
-                    handleDelete={handleDelete}
-                    handleDeleteAction={handleDeleteAction}
-                    handleTriggerAction={handleTriggerAction}
-                    sortConfig={sortConfig}
-                    handleSort={handleSort}
-                    sortProjects={sortProjects}
-                    fetchProjects={fetchProjects}
-                  />
-                }
-              />
-              <Route path="/pods" element={<PodStatus />} />
-              <Route path="/pipeline-status" element={<PipelineStatus />} />
+              <Route path="/auth" element={<AuthPage />} />
+
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => fetchProjects(true)}
+                        onAddProject={() => handleOpenDialog()}
+                        isRefreshing={refreshing}
+                      />
+                      <RepositoriesPage
+                        projects={projects}
+                        loading={loading}
+                        error={error}
+                        handleOpenLogs={handleOpenLogs}
+                        handleOpenActionDialog={handleOpenActionDialog}
+                        handleOpenDialog={handleOpenDialog}
+                        handleDelete={handleDelete}
+                        handleDeleteAction={handleDeleteAction}
+                        handleTriggerAction={handleTriggerAction}
+                        sortConfig={sortConfig}
+                        handleSort={handleSort}
+                        sortProjects={sortProjects}
+                        fetchProjects={fetchProjects}
+                      />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/pods" element={
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => fetchProjects(true)}
+                        onAddProject={() => handleOpenDialog()}
+                        isRefreshing={refreshing}
+                      />
+                      <PodStatus />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/pipeline-status" element={
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => fetchProjects(true)}
+                        onAddProject={() => handleOpenDialog()}
+                        isRefreshing={refreshing}
+                      />
+                      <PipelineStatus />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
@@ -680,10 +718,10 @@ function App() {
               loadingLogs={loadingLogs}
               projectLogs={projectLogs}
             />
-          </Box>
-        </div>
-      </Router>
-    </SearchProvider>
+          </div>
+        </Router>
+      </SearchProvider>
+    </AuthProvider>
   );
 }
 

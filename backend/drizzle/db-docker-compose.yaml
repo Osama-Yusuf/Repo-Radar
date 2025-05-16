@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: quay.io/sclorg/postgresql-15-c9s
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRESQL_USER=repo_radar_user
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRESQL_DATABASE=repo_radar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repo_radar_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

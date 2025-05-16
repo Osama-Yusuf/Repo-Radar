@@ -75,6 +75,15 @@ async function setupDatabase() {
         FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE,
         UNIQUE(action_id, branch, name)
       );
+
+      -- Create users table
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     `;
 
     await db.execute(createTables);
