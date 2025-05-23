@@ -2,34 +2,34 @@ const { KubeConfig, CoreV1Api } = require('@kubernetes/client-node');
 
 /**
  * @description Creates and returns a Kubernetes CoreV1Api client.
- * It first attempts to load configuration from an in-cluster service account.
- * If that fails, it attempts to load configuration from the local kubeconfig file.
+ * It first attempts to load configuration from the local kubeconfig file.
+ * If that fails, it attempts to load configuration from an in-cluster service account.
  * Logs the method used or errors encountered.
  * @returns {CoreV1Api} An instance of the Kubernetes CoreV1Api.
- * @throws {Error} If both in-cluster and default configuration loading fail.
  */
 function getK8sClient() {
   const kc = new KubeConfig();
   let client;
 
   try {
-    console.log('Attempting to load Kubernetes config from cluster...');
-    kc.loadFromCluster();
-    console.log('Successfully loaded Kubernetes config from cluster.');
+    console.log('Attempting to load Kubernetes config from default kubeconfig...');
+    kc.loadFromDefault();
+    console.log('Successfully loaded Kubernetes config from default kubeconfig.');
     client = kc.makeApiClient(CoreV1Api);
     return client;
-  } catch (e) {
-    console.warn('Failed to load Kubernetes config from cluster:', e.message);
-    // Fallback to loading from default kubeconfig
+  } catch (defaultError) {
+    console.warn('Failed to load Kubernetes config from default kubeconfig:', defaultError.message);
+    // Fallback to loading from in-cluster config
     try {
-      console.log('Attempting to load Kubernetes config from default kubeconfig...');
-      kc.loadFromDefault();
-      console.log('Successfully loaded Kubernetes config from default kubeconfig.');
+      console.log('Attempting to load Kubernetes config from cluster...');
+      kc.loadFromCluster();
+      console.log('Successfully loaded Kubernetes config from cluster.');
       client = kc.makeApiClient(CoreV1Api);
       return client;
-    } catch (defaultError) {
-      console.error('Failed to load Kubernetes config from default kubeconfig:', defaultError.message);
-      throw new Error('Could not load Kubernetes configuration from cluster or default. Ensure KUBECONFIG is set or app is running in-cluster.');
+    } catch (e) {
+      console.error('Failed to load Kubernetes config from cluster:', e.message);
+      console.error('Could not load Kubernetes configuration from default or cluster. Check your kubeconfig or ensure app is running in-cluster.');
+      return null; // Return null instead of throwing an error, so the app can continue running
     }
   }
 }
@@ -52,7 +52,26 @@ function getTargetNamespace() {
   return 'default';
 }
 
+/**
+ * Creates a mock Kubernetes client for development environments
+ * @returns {Object} A mock K8s client with basic functionality
+ */
+function createMockK8sClient() {
+  return {
+    listNamespacedPod: async () => {
+      console.log('[MOCK K8S] Returning empty pod list');
+      return {
+        body: {
+          items: []
+        }
+      };
+    },
+    // Add other methods as needed for your application
+  };
+}
+
 module.exports = {
   getK8sClient,
   getTargetNamespace,
+  createMockK8sClient
 };

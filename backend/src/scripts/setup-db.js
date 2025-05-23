@@ -85,7 +85,7 @@ async function setupDatabase() {
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Create tracked_images table (formerly scanned_images)
+      -- Create tracked_images table
       CREATE TABLE IF NOT EXISTS tracked_images (
         id SERIAL PRIMARY KEY,
         image_name TEXT NOT NULL,
@@ -99,7 +99,7 @@ async function setupDatabase() {
         UNIQUE(image_name, image_tag, image_digest)
       );
 
-      -- Create image_vulnerabilities table (formerly vulnerabilities)
+      -- Create image_vulnerabilities table
       CREATE TABLE IF NOT EXISTS image_vulnerabilities (
         id SERIAL PRIMARY KEY,
         tracked_image_id INTEGER NOT NULL REFERENCES tracked_images(id) ON DELETE CASCADE,

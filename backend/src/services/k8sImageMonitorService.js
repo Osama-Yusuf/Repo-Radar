@@ -55,7 +55,7 @@ function parseImageNameAndTag(imageString) {
  * @param {string} imageID - The imageID string from container status.
  * @returns {string | null} The digest (e.g., "sha256:digest") or null if not found.
  */
-functionparseImageDigest(imageID) {
+function parseImageDigest(imageID) {
   if (!imageID) return null;
   const atSymbolIndex = imageID.lastIndexOf('@');
   if (atSymbolIndex > 0 && imageID.substring(atSymbolIndex + 1).startsWith('sha256:')) {
@@ -99,14 +99,14 @@ async function getRunningImages() {
         if (containerStatus && containerStatus.imageID) {
           digest = parseImageDigest(containerStatus.imageID);
           resolvedImageName = containerStatus.image || resolvedImageName; // Prefer status.image if available
-           // Re-parse name and tag from resolved image name if it's different and more specific
+          // Re-parse name and tag from resolved image name if it's different and more specific
           if (containerStatus.image && containerStatus.image !== container.image) {
             const resolvedImageNameAndTag = parseImageNameAndTag(containerStatus.image);
             imageNameAndTag.name = resolvedImageNameAndTag.name;
             imageNameAndTag.tag = resolvedImageNameAndTag.tag;
           }
         }
-        
+
         const imageKey = `${imageNameAndTag.name}:${imageNameAndTag.tag}@${digest || 'nodigest'}`;
         if (!uniqueImages.has(imageKey)) {
           uniqueImages.set(imageKey, {
@@ -132,11 +132,11 @@ async function getRunningImages() {
         const status = (pod.status.initContainerStatuses || []).find(cs => cs.name === container.name);
         processContainer(container, status);
       });
-      
+
       // Process ephemeral containers (if relevant and exist)
       (pod.spec.ephemeralContainers || []).forEach(container => {
-         // Ephemeral containers might not have statuses in the same way or might not be relevant for vulnerability scanning
-         // For now, let's assume they might appear in containerStatuses if running or completed.
+        // Ephemeral containers might not have statuses in the same way or might not be relevant for vulnerability scanning
+        // For now, let's assume they might appear in containerStatuses if running or completed.
         const status = (pod.status.containerStatuses || []).find(cs => cs.name === container.name); // Check regular statuses
         processContainer(container, status);
       });
@@ -163,7 +163,7 @@ function startMonitoring(intervalMs = 60000) {
   }
 
   console.log(`Starting Kubernetes image monitoring for namespace "${targetNamespace}" with interval ${intervalMs}ms.`);
-  
+
   const monitoringTick = async () => {
     console.log('Image monitoring tick started...');
     if (!k8sClient) {
@@ -220,9 +220,15 @@ async function scanPendingImages() {
 
   console.log(`${logPrefix} Found ${pendingImagesToScan.length} images to scan.`);
 
+  // Track how many images were successfully processed
+  let processedImageCount = 0;
+  let successfulImageCount = 0;
+  let imagesWithVulnerabilities = 0;
+
   for (const pendingImage of pendingImagesToScan) {
-    const imageLogPrefix = `[ImageScan ID: ${pendingImage.id} - ${pendingImage.image_name}:${pendingImage.image_tag}${pendingImage.image_digest ? '@'+pendingImage.image_digest.substring(0,10) : ''}]`;
-    console.log(`${imageLogPrefix} Starting scan process.`);
+    processedImageCount++;
+    const imageLogPrefix = `[ImageScan ID: ${pendingImage.id} - ${pendingImage.image_name}:${pendingImage.image_tag}${pendingImage.image_digest ? '@' + pendingImage.image_digest.substring(0, 10) : ''}]`;
+    console.log(`${imageLogPrefix} Starting scan process. (${processedImageCount}/${pendingImagesToScan.length})`);
 
     try {
       // 1. Update status to 'scanning'
@@ -235,9 +241,22 @@ async function scanPendingImages() {
       // 2. Call scanImage
       const scanResult = await scanImage(pendingImage.image_name, pendingImage.image_tag, pendingImage.image_digest);
 
+      // Debug logging to understand the structure of scanResult
+      console.log(`${imageLogPrefix} Scan result structure: ${JSON.stringify({
+        success: scanResult.success,
+        hasData: !!scanResult.data,
+        dataType: scanResult.data ? typeof scanResult.data : 'N/A',
+        isDataArray: scanResult.data ? Array.isArray(scanResult.data) : false,
+        dataKeys: scanResult.data && typeof scanResult.data === 'object' ? Object.keys(scanResult.data) : [],
+        trivyExitCode: scanResult.trivyExitCode,
+        hasRawOutput: !!scanResult.rawOutput,
+        hasError: !!scanResult.error,
+        hasDetails: !!scanResult.details
+      }, null, 2)}`);
+
       let finalScanStatus = 'failed'; // Default to failed
       let rawOutputToStore = scanResult.rawOutput || scanResult.details || scanResult.error || null;
-      
+
       if (scanResult.success) {
         finalScanStatus = 'success';
         rawOutputToStore = scanResult.data; // Store the parsed JSON
@@ -249,54 +268,147 @@ async function scanPendingImages() {
           .where(eq(image_vulnerabilities.tracked_image_id, pendingImage.id))
           .execute();
         console.log(`${imageLogPrefix} Old vulnerabilities cleared.`);
-        
+
         // 4. Store New Vulnerabilities
         // Trivy JSON output can be an array of results (if multiple targets scanned, though we do one by one)
         // or a single object with a "Results" array, or directly a "Vulnerabilities" array.
         // The trivyScanService returns the parsed JSON directly as scanResult.data.
         // We assume scanResult.data is the top-level object/array from Trivy.
         let vulnerabilitiesToInsert = [];
-        const results = Array.isArray(scanResult.data) ? scanResult.data : [scanResult.data]; // Handle if data is a single obj or array
 
-        for (const result of results) {
-            if (result && result.Vulnerabilities && Array.isArray(result.Vulnerabilities)) {
-                result.Vulnerabilities.forEach(vuln => {
+        // More detailed logging of the data structure
+        if (scanResult.data) {
+          console.log(`${imageLogPrefix} Data structure: ${typeof scanResult.data}, isArray: ${Array.isArray(scanResult.data)}`);
+          if (typeof scanResult.data === 'object') {
+            console.log(`${imageLogPrefix} Top-level keys: ${Object.keys(scanResult.data).join(', ')}`);
+
+            // Check for Results array which is common in Trivy output
+            if (scanResult.data.Results && Array.isArray(scanResult.data.Results)) {
+              console.log(`${imageLogPrefix} Found Results array with ${scanResult.data.Results.length} items`);
+
+              // Process each result in the Results array
+              for (const resultItem of scanResult.data.Results) {
+                console.log(`${imageLogPrefix} Result item keys: ${Object.keys(resultItem).join(', ')}`);
+
+                if (resultItem.Vulnerabilities && Array.isArray(resultItem.Vulnerabilities)) {
+                  console.log(`${imageLogPrefix} Found ${resultItem.Vulnerabilities.length} vulnerabilities in result item`);
+
+                  resultItem.Vulnerabilities.forEach(vuln => {
                     vulnerabilitiesToInsert.push({
-                        tracked_image_id: pendingImage.id,
-                        vulnerability_cve_id: vuln.VulnerabilityID,
-                        pkgName: vuln.PkgName,
-                        installedVersion: vuln.InstalledVersion,
-                        fixedVersion: vuln.FixedVersion,
-                        severity: vuln.Severity,
-                        title: vuln.Title,
-                        description: vuln.Description,
-                        datasource: vuln.DataSource ? vuln.DataSource.Name : null, // Adjust based on actual Trivy output structure for datasource
-                        created_at: new Date(),
+                      tracked_image_id: pendingImage.id,
+                      vulnerability_cve_id: vuln.VulnerabilityID,
+                      pkgName: vuln.PkgName,
+                      installedVersion: vuln.InstalledVersion,
+                      fixedVersion: vuln.FixedVersion || null,
+                      severity: vuln.Severity,
+                      title: vuln.Title || null,
+                      description: vuln.Description || null,
+                      datasource: vuln.DataSource ? vuln.DataSource.Name : null,
+                      created_at: new Date(),
                     });
-                });
-            } else if (result && Array.isArray(result.Vulnerabilities)) { // Some older Trivy versions might nest it differently
-                 console.warn(`${imageLogPrefix} Found Vulnerabilities directly under a result item, processing.`);
-                 // Similar processing as above
+                  });
+                }
+              }
+            } else {
+              // Process the original way if no Results array
+              const results = Array.isArray(scanResult.data) ? scanResult.data : [scanResult.data];
+
+              for (const result of results) {
+                if (result && result.Vulnerabilities && Array.isArray(result.Vulnerabilities)) {
+                  console.log(`${imageLogPrefix} Found ${result.Vulnerabilities.length} vulnerabilities directly in result`);
+
+                  result.Vulnerabilities.forEach(vuln => {
+                    vulnerabilitiesToInsert.push({
+                      tracked_image_id: pendingImage.id,
+                      vulnerability_cve_id: vuln.VulnerabilityID,
+                      pkgName: vuln.PkgName,
+                      installedVersion: vuln.InstalledVersion,
+                      fixedVersion: vuln.FixedVersion || null,
+                      severity: vuln.Severity,
+                      title: vuln.Title || null,
+                      description: vuln.Description || null,
+                      datasource: vuln.DataSource ? vuln.DataSource.Name : null,
+                      created_at: new Date(),
+                    });
+                  });
+                }
+              }
             }
+          }
         }
-        
+
         if (vulnerabilitiesToInsert.length > 0) {
-          await db.insert(image_vulnerabilities).values(vulnerabilitiesToInsert).execute();
-          console.log(`${imageLogPrefix} ${vulnerabilitiesToInsert.length} new vulnerabilities stored.`);
+          console.log(`${imageLogPrefix} Inserting ${vulnerabilitiesToInsert.length} vulnerabilities into database`);
+          try {
+            // Log a sample of the vulnerabilities being inserted (first 2)
+            console.log(`${imageLogPrefix} Sample vulnerability data (first 2 of ${vulnerabilitiesToInsert.length}):`);
+            console.log(JSON.stringify(vulnerabilitiesToInsert.slice(0, 2), null, 2));
+
+            // Break up large vulnerability sets into smaller batches to avoid DB issues
+            const BATCH_SIZE = 100;
+            if (vulnerabilitiesToInsert.length > BATCH_SIZE) {
+              console.log(`${imageLogPrefix} Breaking up ${vulnerabilitiesToInsert.length} vulnerabilities into batches of ${BATCH_SIZE}`);
+
+              let insertedCount = 0;
+              for (let i = 0; i < vulnerabilitiesToInsert.length; i += BATCH_SIZE) {
+                const batch = vulnerabilitiesToInsert.slice(i, i + BATCH_SIZE);
+                console.log(`${imageLogPrefix} Inserting batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(vulnerabilitiesToInsert.length / BATCH_SIZE)} (${batch.length} items)`);
+                await db.insert(image_vulnerabilities).values(batch).execute();
+                insertedCount += batch.length;
+              }
+              console.log(`${imageLogPrefix} All batches inserted successfully. Total: ${insertedCount} vulnerabilities.`);
+            } else {
+              // Insert all at once for smaller sets
+              await db.insert(image_vulnerabilities).values(vulnerabilitiesToInsert).execute();
+              console.log(`${imageLogPrefix} ${vulnerabilitiesToInsert.length} new vulnerabilities stored in a single batch.`);
+            }
+
+            imagesWithVulnerabilities++;
+          } catch (insertError) {
+            console.error(`${imageLogPrefix} Error inserting vulnerabilities: ${insertError.message}`);
+            if (insertError.code) {
+              console.error(`${imageLogPrefix} Database error code: ${insertError.code}`);
+            }
+            if (insertError.detail) {
+              console.error(`${imageLogPrefix} Error detail: ${insertError.detail}`);
+            }
+            console.error(insertError);
+
+            // Try to insert one by one as a fallback
+            console.log(`${imageLogPrefix} Attempting to insert vulnerabilities one by one as fallback...`);
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < vulnerabilitiesToInsert.length; i++) {
+              try {
+                await db.insert(image_vulnerabilities).values([vulnerabilitiesToInsert[i]]).execute();
+                successCount++;
+              } catch (singleInsertError) {
+                failCount++;
+                if (failCount <= 5) { // Only log the first few errors to avoid flooding logs
+                  console.error(`${imageLogPrefix} Failed to insert vulnerability #${i + 1}: ${singleInsertError.message}`);
+                }
+              }
+            }
+
+            console.log(`${imageLogPrefix} Individual insert results: ${successCount} succeeded, ${failCount} failed`);
+            if (successCount > 0) {
+              imagesWithVulnerabilities++;
+            }
+          }
         } else {
           console.log(`${imageLogPrefix} No vulnerabilities found or reported in scan result.`);
         }
-
       } else {
         // Scan failed or Trivy reported an issue
         // Example: 'Image not found by Trivy', 'Trivy scanner initialization or database error', 'Scan timed out'
         // These specific errors come from trivyScanService's error messages.
         if (scanResult.error && scanResult.error.toLowerCase().includes("image not found")) {
-            finalScanStatus = 'image_not_found_in_registry';
+          finalScanStatus = 'image_not_found_in_registry';
         } else if (scanResult.error && scanResult.error.toLowerCase().includes("timeout")) {
-            finalScanStatus = 'scan_timeout';
+          finalScanStatus = 'scan_timeout';
         } else {
-            finalScanStatus = 'failed'; // Generic failure
+          finalScanStatus = 'failed'; // Generic failure
         }
         console.error(`${imageLogPrefix} Scan failed. Error: ${scanResult.error}. Details: ${scanResult.details}`);
       }
@@ -306,13 +418,15 @@ async function scanPendingImages() {
         .set({
           scan_status: finalScanStatus,
           last_scanned_at: new Date(),
-          raw_trivy_output: rawOutputToStore, // Stored as JSONB
+          raw_trivy_output: rawOutputToStore, // Store the scan result data
           updated_at: new Date(),
         })
         .where(eq(tracked_images.id, pendingImage.id))
         .execute();
       console.log(`${imageLogPrefix} Final status updated to '${finalScanStatus}'. Scan process complete.`);
-
+      if (finalScanStatus === 'success') {
+        successfulImageCount++;
+      }
     } catch (error) {
       console.error(`${imageLogPrefix} Unhandled error during scan processing for image ID ${pendingImage.id}:`, error.message, error.stack ? `\nStack: ${error.stack}` : '');
       // Optionally, mark the image as 'failed' to prevent it from being stuck in 'scanning'
@@ -327,13 +441,12 @@ async function scanPendingImages() {
       }
     }
   } // end for loop
-  console.log(`${logPrefix} Finished processing all pending images.`);
+  console.log(`${logPrefix} Finished processing all pending images. Summary: ${processedImageCount} images processed, ${successfulImageCount} images successfully scanned, ${imagesWithVulnerabilities} images with vulnerabilities.`);
 }
-
 
 async function processDiscoveredImage(discoveredImage) {
   const { name, tag, digest } = discoveredImage;
-  const logPrefix = `Image [${name}:${tag}${digest ? ('@' + digest.substring(0,15)) : ''}]:`;
+  const logPrefix = `Image [${name}:${tag}${digest ? ('@' + digest.substring(0, 15)) : ''}]:`;
 
   try {
     // Ensure logPrefix is defined at the start of the function for consistent use, even in error paths.
@@ -360,8 +473,8 @@ async function processDiscoveredImage(discoveredImage) {
     // This helps find records that might need their digest updated or were added without one.
     if (existingImageEntries.length === 0) {
       if (digest) {
-         // This means we have a digest, but didn't find an exact match.
-         // Look for name/tag where digest is NULL (potential update) or a different digest (also an update).
+        // This means we have a digest, but didn't find an exact match.
+        // Look for name/tag where digest is NULL (potential update) or a different digest (also an update).
         queryDescription = `by name and tag (current digest: ${digest}, looking for existing with different or NULL digest)`;
       } else {
         queryDescription = `by name and tag (no current digest)`;
@@ -379,7 +492,7 @@ async function processDiscoveredImage(discoveredImage) {
         .limit(1)
         .execute();
     }
-    
+
     const existingImageEntry = existingImageEntries[0];
 
     if (!existingImageEntry) {
@@ -410,11 +523,11 @@ async function processDiscoveredImage(discoveredImage) {
         // updates.raw_trivy_output = null; // Drizzle specific for JSONB null. Handled by scan service.
         updates.last_scanned_at = null; // Reset last_scanned_at for the new digest
         needsRescan = true;
-        reasonForRescan = `new digest detected ('${digest.substring(0,15)}' vs old '${existingImageEntry.image_digest ? existingImageEntry.image_digest.substring(0,15) : 'NULL'}')`;
+        reasonForRescan = `new digest detected ('${digest.substring(0, 15)}' vs old '${existingImageEntry.image_digest ? existingImageEntry.image_digest.substring(0, 15) : 'NULL'}')`;
       } else if (!digest && existingImageEntry.image_digest) {
         // We saw it with a digest before, but now it appears without one (e.g. K8s API not returning digest yet).
         // This is less common. For now, we'll log. A rescan might not be needed unless it's stale.
-        console.log(`${logPrefix} Image previously had digest '${existingImageEntry.image_digest.substring(0,15)}', now observed without one. Keeping existing digest for now.`);
+        console.log(`${logPrefix} Image previously had digest '${existingImageEntry.image_digest.substring(0, 15)}', now observed without one. Keeping existing digest for now.`);
       }
 
 
@@ -440,20 +553,20 @@ async function processDiscoveredImage(discoveredImage) {
           reasonForRescan = `scan results are stale (last scanned on ${existingImageEntry.last_scanned_at})`;
         }
       }
-      
+
       if (Object.keys(updates).length > 2) { // more than just last_seen_at and updated_at
-         console.log(`${logPrefix} Updating DB entry. Changes: ${JSON.stringify(updates)}`);
-         await db.update(tracked_images)
+        console.log(`${logPrefix} Updating DB entry. Changes: ${JSON.stringify(updates)}`);
+        await db.update(tracked_images)
           .set(updates)
           .where(eq(tracked_images.id, existingImageEntry.id))
           .execute();
       } else {
-         // Only last_seen_at and updated_at would be updated
-         await db.update(tracked_images)
+        // Only last_seen_at and updated_at would be updated
+        await db.update(tracked_images)
           .set({ last_seen_at: new Date(), updated_at: new Date() })
           .where(eq(tracked_images.id, existingImageEntry.id))
           .execute();
-         console.log(`${logPrefix} Image known and up-to-date. Updated last_seen_at.`);
+        console.log(`${logPrefix} Image known and up-to-date. Updated last_seen_at.`);
       }
 
       if (needsRescan) {
@@ -469,6 +582,6 @@ module.exports = {
   getRunningImages,
   startMonitoring,
   processDiscoveredImage, // Exporting for potential direct use or testing
-  parseImageNameAndTag, 
-  parseImageDigest 
+  parseImageNameAndTag,
+  parseImageDigest
 };

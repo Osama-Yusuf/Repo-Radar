@@ -83,7 +83,7 @@ const tracked_images = pgTable('tracked_images', {
     image_digest: text('image_digest'), // Nullable
     last_scanned_at: timestamp('last_scanned_at').defaultNow().notNull(),
     scan_status: text('scan_status').notNull(), // e.g., 'pending', 'scanning', 'success', 'failed'
-    // rawTrivyOutput removed as per new requirements for this table, will be in image_scan_results if needed
+    raw_trivy_output: jsonb('raw_trivy_output'), // Added back to match database structure
     created_at: timestamp('created_at').defaultNow().notNull(),
     updated_at: timestamp('updated_at').defaultNow().notNull()
 }, (table) => {

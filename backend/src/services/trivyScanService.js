@@ -33,9 +33,6 @@ async function scanImage(imageName, imageTag, imageDigest) {
     '--format', 'json',
     '--quiet', // Suppresses progress bar and non-JSON output to stderr if successful
     '--severity', 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN', // Include UNKNOWN severity
-    '--ignore-unfixed', // Optionally, to ignore vulnerabilities with no fix available (can be made configurable)
-    // '--skip-db-update', // Optionally, if running frequently and want to rely on a central DB update
-    // '--skip-java-db-update', 
     imageStringToScan
   ];
 

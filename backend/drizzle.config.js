@@ -9,6 +9,6 @@ module.exports = {
   strict: true,
   verbose: true,
   dbCredentials: {
-    uri: `postgresql://${process.env.POSTGRESQL_USER || 'repo_radar_user'}:${process.env.POSTGRESQL_PASSWORD}@${process.env.POSTGRESQL_HOST || 'localhost'}:${process.env.POSTGRESQL_PORT || '5432'}/${process.env.POSTGRESQL_DATABASE || 'repo_radar'}`
+    url: `postgresql://${process.env.POSTGRESQL_USER || 'repo_radar_user'}:${process.env.POSTGRESQL_PASSWORD}@${process.env.POSTGRESQL_HOST || 'localhost'}:${process.env.POSTGRESQL_PORT || '5432'}/${process.env.POSTGRESQL_DATABASE || 'repo_radar'}`
   }
 }
