@@ -6,6 +6,7 @@ const util = require('util');
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+const appsV1Api = kc.makeApiClient(k8s.AppsV1Api); // Import AppsV1Api
 const metricsApi = kc.makeApiClient(k8s.CustomObjectsApi);
 
 // Helper function to format pod age
@@ -148,6 +149,29 @@ router.get('/pods', async (req, res) => {
   } catch (error) {
     console.error('Error fetching pods:', error);
     res.status(500).json({ error: 'Failed to fetch pod status' });
+  }
+});
+
+// Get deployments with image information
+router.get('/deployments-with-images', async (req, res) => {
+  try {
+    const response = await appsV1Api.listNamespacedDeployment('default');
+    const deployments = response.body.items.map(deployment => {
+      const firstContainer = deployment.spec.template.spec.containers?.[0];
+      const imageName = firstContainer?.image || null;
+
+      return {
+        deploymentName: deployment.metadata.name,
+        namespace: deployment.metadata.namespace,
+        replicas: deployment.spec.replicas,
+        availableReplicas: deployment.status.availableReplicas || 0, // Ensure a default value if undefined
+        imageName: imageName,
+      };
+    });
+    res.json(deployments);
+  } catch (error) {
+    console.error('Error fetching deployments:', error);
+    res.status(500).json({ error: 'Failed to fetch deployments' });
   }
 });
 
