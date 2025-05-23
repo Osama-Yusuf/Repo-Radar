@@ -1,6 +1,6 @@
 # 🛰️ Repo Radar
 
-> Your Mission Control Center for GitHub Repositories
+> Your Mission Control Center for GitHub Repositories, Kubernetes Monitoring, and CI/CD Pipelines
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D%2016.0.0-brightgreen)
@@ -8,9 +8,13 @@
 
 ## 🎯 What is Repo Radar?
 
-Repo Radar is your intelligent GitHub repository monitoring system that keeps you in sync with repository changes and automates responses. Think of it as your personal watchtower that never sleeps! 
+Repo Radar is your intelligent monitoring system that keeps you in sync with GitHub repository changes, automates responses, scans Kubernetes deployments for vulnerabilities, and tracks CI/CD pipeline executions. Think of it as your personal mission control center that never sleeps! 
 
 🔬 **Want to dive deep into the monitoring magic?** Check out our [Backend Documentation](backend/README.md) to explore the intricate details of how Repo Radar keeps your repositories under constant surveillance.
+
+🔒 **Concerned about container security?** Repo Radar includes powerful vulnerability scanning for your Kubernetes deployments, helping you identify and address security issues before they become problems.
+
+⚙️ **Need CI/CD visibility?** Repo Radar integrates with Tekton pipelines to provide real-time monitoring of your build and deployment processes.
 
 ## 💡 Power User Tips
 
@@ -24,6 +28,27 @@ Get the most out of Repo-Radar with these advanced tips:
 
 - **Repository Naming**: Follow the standard format `backend-service-dev` in your configuration for consistent monitoring and webhook triggers.
 - **Deployment Names**: Deployment names in Kubernetes should follow the format `backend-service-dev` for automatic correlation with monitored repositories.
+
+### 🔒 Vulnerability Scanning
+
+- **Automated Scanning**: Repo Radar automatically scans container images in your Kubernetes deployments for vulnerabilities using Trivy.
+- **Severity Filtering**: Filter vulnerability results by severity (CRITICAL, HIGH, MEDIUM, LOW) to focus on the most important issues.
+- **Package Tracking**: Identify vulnerable packages and available fixed versions to streamline remediation efforts.
+- **Detailed Reporting**: View comprehensive vulnerability details including CVE IDs, affected packages, and remediation guidance.
+
+### 🖥️ Kubernetes Monitoring
+
+- **Pod Status**: Monitor the status, age, and resource usage of all pods in your Kubernetes clusters.
+- **Deployment Tracking**: Track deployments across all namespaces, including replica counts and container images.
+- **Resource Utilization**: View CPU and memory usage metrics for pods and containers.
+- **Log Access**: Access pod logs directly from the interface for quick troubleshooting.
+
+### 🚀 CI/CD Pipeline Monitoring
+
+- **Tekton Integration**: View all Tekton pipeline runs with detailed status information.
+- **Task Tracking**: Monitor individual tasks within pipelines, including execution time and status.
+- **Log Aggregation**: Access logs for all pipeline tasks from a single interface.
+- **Pipeline Parameters**: View parameters used for each pipeline run for better traceability.
 
 ### ⚙️ Advanced Features
 

@@ -21,12 +21,18 @@ services:
     ports:
       - "${PORT:-3001}:${PORT:-3001}"
     environment:
+      - GITHUB_API_URL=${GITHUB_API_URL:-https://github.ibm.com/api/v3}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-<Your_Github_Token>}
       - PORT=${PORT:-3001}
-      - POSTGRESQL_HOST=postgres
-      - POSTGRESQL_PORT=5432
-      - POSTGRESQL_DATABASE=repo_radar
-      - POSTGRESQL_USER=repo_radar_user
+      - POSTGRESQL_HOST=${POSTGRESQL_HOST:-postgres}
+      - POSTGRESQL_PORT=${POSTGRESQL_PORT:-5432}
+      - POSTGRESQL_DATABASE=${POSTGRESQL_DATABASE:-repo_radar}
+      - POSTGRESQL_USER=${POSTGRESQL_USER:-repo_radar_user}
       - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - K8S_TARGET_NAMESPACE=${K8S_TARGET_NAMESPACE:-default}
     depends_on:
       postgres:
         condition: service_healthy
