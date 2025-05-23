@@ -85,33 +85,39 @@ async function setupDatabase() {
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Create scanned_images table
-      CREATE TABLE IF NOT EXISTS scanned_images (
+      -- Create tracked_images table (formerly scanned_images)
+      CREATE TABLE IF NOT EXISTS tracked_images (
         id SERIAL PRIMARY KEY,
-        image_name TEXT NOT NULL UNIQUE,
+        image_name TEXT NOT NULL,
+        image_tag TEXT NOT NULL,
+        image_digest TEXT,
         last_scanned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        status TEXT NOT NULL,
-        raw_trivy_output JSONB
+        scan_status TEXT NOT NULL,
+        raw_trivy_output JSONB,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(image_name, image_tag, image_digest)
       );
 
-      -- Create vulnerabilities table
-      CREATE TABLE IF NOT EXISTS vulnerabilities (
+      -- Create image_vulnerabilities table (formerly vulnerabilities)
+      CREATE TABLE IF NOT EXISTS image_vulnerabilities (
         id SERIAL PRIMARY KEY,
-        scanned_image_id INTEGER NOT NULL REFERENCES scanned_images(id) ON DELETE CASCADE,
-        vulnerability_id TEXT NOT NULL,
+        tracked_image_id INTEGER NOT NULL REFERENCES tracked_images(id) ON DELETE CASCADE,
+        vulnerability_cve_id TEXT NOT NULL,
         pkg_name TEXT NOT NULL,
         installed_version TEXT NOT NULL,
         fixed_version TEXT,
         severity TEXT NOT NULL,
         title TEXT,
         description TEXT,
-        datasource TEXT
+        datasource TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Create indexes for vulnerabilities table
-      CREATE INDEX IF NOT EXISTS idx_vulnerabilities_scanned_image_id ON vulnerabilities(scanned_image_id);
-      CREATE INDEX IF NOT EXISTS idx_vulnerabilities_vulnerability_id ON vulnerabilities(vulnerability_id);
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_vulnerabilities_unique_vuln ON vulnerabilities(scanned_image_id, vulnerability_id, pkg_name, installed_version);
+      -- Create indexes for image_vulnerabilities table
+      CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_tracked_image_id ON image_vulnerabilities(tracked_image_id);
+      CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_vulnerability_cve_id ON image_vulnerabilities(vulnerability_cve_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_image_vulnerabilities_unique_vuln ON image_vulnerabilities(tracked_image_id, vulnerability_cve_id, pkg_name, installed_version);
     `;
 
     await db.execute(createTables);
