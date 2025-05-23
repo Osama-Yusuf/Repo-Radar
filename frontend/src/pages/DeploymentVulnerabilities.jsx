@@ -3,7 +3,9 @@ import axios from 'axios';
 import { Container, Typography, CircularProgress, Box, Alert } from '@mui/material';
 import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard'; // Import the card
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+// Corrected API_BASE_URL definition using Vite environment variables
+const PORT = import.meta.env.VITE_PORT || '3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 /**
  * @component DeploymentVulnerabilities
