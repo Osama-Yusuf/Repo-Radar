@@ -12,7 +12,37 @@ Repo Radar is your intelligent GitHub repository monitoring system that keeps yo
 
 🔬 **Want to dive deep into the monitoring magic?** Check out our [Backend Documentation](backend/README.md) to explore the intricate details of how Repo Radar keeps your repositories under constant surveillance.
 
-### 🌟 Key Features
+## 💡 Power User Tips
+
+Get the most out of Repo-Radar with these advanced tips:
+
+### 🔍 Commit ID Extraction
+
+- **Image Name Parsing**: Repo-Radar automatically extracts commit hashes from container image tags using the pattern `:COMMIT_HASH--` (e.g., `myimage:a1b2c3d--main`). This allows you to track which code version is deployed without explicit labels.
+
+### 📋 Naming Conventions
+
+- **Repository Naming**: Follow the standard format `backend-service-dev` in your configuration for consistent monitoring and webhook triggers.
+- **Deployment Names**: Deployment names in Kubernetes should follow the format `backend-service-dev` for automatic correlation with monitored repositories.
+
+### ⚙️ Advanced Features
+
+- **Webhook Parameters**: Configure branch-specific parameters for webhook actions to customize behavior based on which branch triggered the event.
+- **Environment Variables**: All script actions automatically receive environment variables with commit details (`COMMIT_SHA`, `COMMIT_MESSAGE`, `COMMIT_AUTHOR`, `COMMIT_DATE`).
+- **Rate Limiting**: The system includes built-in rate limiting to prevent excessive API calls, with a minimum 1-minute interval between checks.
+
+### 🧩 Integration Tips
+
+- **Tekton Pipelines**: Repo-Radar seamlessly integrates with Tekton pipelines in the `devops` namespace, displaying pipeline runs and task details.
+- **Kubernetes Pods**: The system monitors pods in the `default` namespace, extracting commit information from labels and image names.
+- **PostgreSQL**: Uses the `quay.io/sclorg/postgresql-15-c9s` image with environment variables using the `POSTGRESQL_*` prefix instead of `POSTGRES_*`.
+
+### 🧠 Memory Management
+
+- **Caching Strategy**: Repo-Radar maintains an in-memory cache of project data to reduce database queries and improve performance.
+- **Timer Management**: Each project has its own monitoring timer with randomized initial delays to prevent simultaneous API calls.
+
+## 🌟 Key Features
 
 - **🔍 Real-time Monitoring**
   - Track multiple repositories and branches
