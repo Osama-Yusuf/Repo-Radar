@@ -16,7 +16,7 @@ const setupActionRoutes = require('./src/routes/actionRoutes');
 const setupAuthRoutes = require('./src/routes/authRoutes');
 const k8sRoutes = require('./src/routes/k8s');
 const tektonRoutes = require('./src/routes/tekton');
-// const vulnerabilityRoutes = require('./src/routes/vulnerabilityRoutes'); // Import vulnerability routes
+const vulnerabilityRoutes = require('./src/routes/vulnerabilities');
 const { startMonitoring: startK8sImageMonitoring } = require('./src/services/k8sImageMonitorService');
 
 const app = express();
@@ -55,7 +55,7 @@ async function initializeApp() {
         app.use('/api/auth', authRouter);
         app.use('/api/k8s', k8sRoutes);
         app.use('/api/tekton', tektonRoutes);
-        // app.use('/api/vulnerabilities', vulnerabilityRoutes); // Mount vulnerability routes
+        app.use('/api/vulnerabilities', vulnerabilityRoutes); // Mount vulnerability routes
 
         // Swagger documentation
         app.use('/', swaggerUi.serve);

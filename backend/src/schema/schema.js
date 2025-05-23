@@ -75,7 +75,7 @@ const users = pgTable('users', {
     updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-// Tracked Images table (formerly scannedImages)
+// Tracked Images table
 const tracked_images = pgTable('tracked_images', {
     id: serial('id').primaryKey(),
     image_name: text('image_name').notNull(), // No longer unique on its own
@@ -93,7 +93,7 @@ const tracked_images = pgTable('tracked_images', {
     };
 });
 
-// Image Vulnerabilities table (formerly vulnerabilitiesTable)
+// Image Vulnerabilities table
 const image_vulnerabilities = pgTable('image_vulnerabilities', {
     id: serial('id').primaryKey(),
     tracked_image_id: integer('tracked_image_id').notNull().references(() => tracked_images.id, { onDelete: 'cascade' }),
