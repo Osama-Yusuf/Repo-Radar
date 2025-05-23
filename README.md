@@ -61,11 +61,35 @@ Get the most out of Repo-Radar with these advanced tips:
 
 ## 🚀 Quick Start
 
+### 🐳 Installation Using Docker
+
 ### Prerequisites
-- Node.js ≥ 16.0.0
+- Docker
+- Docker Compose
 - GitHub Personal Access Token
 
-### Installation
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Osama-Yusuf/repo-radar.git
+   cd repo-radar
+   ```
+   
+2. **Update .env file**
+   ```bash
+   cp .env.example .env    # Configure your envs
+   ```
+
+3. **Build and Run Docker Compose**
+   ```bash
+   docker compose build
+   docker compose up -d
+   ```
+
+### 📦 Installation Using NPM
+
+### Prerequisites
+- Node.js ≥ 18.0.0
+- GitHub Personal Access Token
 
 1. **Clone the repository**
    ```bash
@@ -78,15 +102,22 @@ Get the most out of Repo-Radar with these advanced tips:
    cd backend
    npm install
    cp .env.example .env    # Configure your GitHub token
-   npm start
+   npm run dev
    ```
 
-3. **Frontend Setup**
+3. **Drizzle Studio (Optionally)**
    ```bash
-   cd ../RepoRadar
+   npm run studio
+   ```
+
+4. **Frontend Setup**
+   ```bash
+   cd ../frontend
    npm install
    npm run dev
    ```
+
+
 
 4. Open `http://localhost:5173` in your browser
 
