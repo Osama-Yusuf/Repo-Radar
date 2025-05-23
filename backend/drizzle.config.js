@@ -2,9 +2,10 @@ require('dotenv').config();
 
 /** @type { import("drizzle-kit").Config } */
 module.exports = {
+  dialect: 'postgresql', // Added dialect for PostgreSQL
   schema: "./src/schema/schema.js",
   out: "./drizzle",
-  driver: 'mysql2',
+  // driver: 'pg', // Removed driver field, dialect should be sufficient
   strict: true,
   verbose: true,
   dbCredentials: {

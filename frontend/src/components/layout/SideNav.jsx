@@ -4,13 +4,15 @@ import {
   Source as SourceIcon,
   Memory as MemoryIcon,
   Refresh as RefreshIcon,
-  AutoMode as AutoModeIcon
+  AutoMode as AutoModeIcon,
+  Security as SecurityIcon // Import the SecurityIcon
 } from '@mui/icons-material';
 
 const navItems = [
   { path: '/', label: 'Repositories', icon: <SourceIcon /> },
   { path: '/pods', label: 'Pod Status', icon: <MemoryIcon /> },
   { path: '/pipeline-status', label: 'Pipeline Status', icon: <AutoModeIcon /> },
+  { path: '/vulnerabilities', label: 'Vulnerabilities', icon: <SecurityIcon /> }, // Add new nav item
 ];
 
 const SideNav = () => {

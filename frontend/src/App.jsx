@@ -17,6 +17,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import PodStatus from './pages/PodStatus';
 import PipelineStatus from './pages/PipelineStatus';
 import AuthPage from './pages/AuthPage';
+import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities'; // Import the new page
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -678,6 +679,22 @@ function App() {
                         isRefreshing={refreshing}
                       />
                       <PipelineStatus />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/vulnerabilities" element={ // Add new route for vulnerabilities
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => fetchProjects(true)} // Or a relevant refresh function
+                        onAddProject={() => handleOpenDialog()} // Or relevant action
+                        isRefreshing={refreshing} // Or relevant state
+                      />
+                      <DeploymentVulnerabilities />
                     </Box>
                   </>
                 </ProtectedRoute>
