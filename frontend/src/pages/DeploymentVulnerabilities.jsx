@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Container, Typography, CircularProgress, Box, Alert, Paper } from '@mui/material';
+import { Container, Typography, CircularProgress, Box, Alert } from '@mui/material';
 import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard'; // Import the card
-import { SecurityTwoTone as SecurityIcon } from '@mui/icons-material';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
 
 /**
  * @component DeploymentVulnerabilities
@@ -20,9 +21,6 @@ const DeploymentVulnerabilities = () => {
   const [loading, setLoading] = useState(true);
   // State: error - Stores any error object or message if fetching deployments fails.
   const [error, setError] = useState(null);
-
-  const PORT = import.meta.env.VITE_PORT || '3001';
-  const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
   // useEffect: Fetches the list of deployments when the component mounts.
   // It sets the loading state, makes an API call, and updates either
@@ -72,67 +70,7 @@ const DeploymentVulnerabilities = () => {
         Deployment Vulnerabilities
       </Typography>
       {deployments.length === 0 && !loading && (
-        <Paper
-          sx={{
-            p: 5,
-            borderRadius: '16px',
-            textAlign: 'center',
-            background: 'rgba(255, 255, 255, 0.03)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            mt: 4
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              py: 5
-            }}
-          >
-            <Box
-              sx={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(25, 118, 210, 0.1)',
-                mb: 3
-              }}
-            >
-              <SecurityIcon
-                sx={{
-                  fontSize: 64,
-                  color: 'rgba(25, 118, 210, 0.8)'
-                }}
-              />
-            </Box>
-            <Typography
-              variant="h5"
-              sx={{
-                color: '#fff',
-                fontWeight: 500,
-                mb: 2
-              }}
-            >
-              No Deployments Found
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                maxWidth: 500,
-                mb: 2
-              }}
-            >
-              There are no active deployments at the moment. Deployments with vulnerability information will appear here when they're created.
-            </Typography>
-          </Box>
-        </Paper>
+        <Typography sx={{ textAlign: 'center', mt: 5 }}>No deployments found.</Typography>
       )}
       {deployments.map((deployment) => (
         <DeploymentVulnerabilityCard key={deployment.deploymentName} deployment={deployment} />

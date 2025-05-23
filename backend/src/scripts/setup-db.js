@@ -84,6 +84,34 @@ async function setupDatabase() {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Create scanned_images table
+      CREATE TABLE IF NOT EXISTS scanned_images (
+        id SERIAL PRIMARY KEY,
+        image_name TEXT NOT NULL UNIQUE,
+        last_scanned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status TEXT NOT NULL,
+        raw_trivy_output JSONB
+      );
+
+      -- Create vulnerabilities table
+      CREATE TABLE IF NOT EXISTS vulnerabilities (
+        id SERIAL PRIMARY KEY,
+        scanned_image_id INTEGER NOT NULL REFERENCES scanned_images(id) ON DELETE CASCADE,
+        vulnerability_id TEXT NOT NULL,
+        pkg_name TEXT NOT NULL,
+        installed_version TEXT NOT NULL,
+        fixed_version TEXT,
+        severity TEXT NOT NULL,
+        title TEXT,
+        description TEXT,
+        datasource TEXT
+      );
+
+      -- Create indexes for vulnerabilities table
+      CREATE INDEX IF NOT EXISTS idx_vulnerabilities_scanned_image_id ON vulnerabilities(scanned_image_id);
+      CREATE INDEX IF NOT EXISTS idx_vulnerabilities_vulnerability_id ON vulnerabilities(vulnerability_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vulnerabilities_unique_vuln ON vulnerabilities(scanned_image_id, vulnerability_id, pkg_name, installed_version);
     `;
 
     await db.execute(createTables);
