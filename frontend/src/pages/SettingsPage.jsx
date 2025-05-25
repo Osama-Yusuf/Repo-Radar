@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import axios from 'axios';
 import {
     Tabs, Tab, TextField, Button, Paper, Typography, Box, CircularProgress, Alert,
@@ -44,7 +44,6 @@ const SettingsPage = () => {
     const [generalSettingsSuccess, setGeneralSettingsSuccess] = useState('');
     const [namespacesInput, setNamespacesInput] = useState('');
 
-
     // User Management State
     const [users, setUsers] = useState([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -62,15 +61,17 @@ const SettingsPage = () => {
     const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user' });
     const [editUserRole, setEditUserRole] = useState('user');
 
-
-    const axiosConfig = {
+    // Create axios config with token from AuthContext
+    const axiosConfig = useMemo(() => ({
         headers: { Authorization: `Bearer ${token}` }
-    };
+    }), [token]);
 
     // Fetch General Settings
     useEffect(() => {
-        if (tabValue === 0 && currentUser?.role === 'admin') {
+        if (tabValue === 0 && currentUser?.role === 'admin' && token) {
             setLoadingGeneralSettings(true);
+            setGeneralSettingsError('');
+
             axios.get(`${API_BASE_URL}/settings`, axiosConfig)
                 .then(response => {
                     setGeneralSettings(response.data);
@@ -79,21 +80,23 @@ const SettingsPage = () => {
                 })
                 .catch(error => {
                     console.error('Error fetching general settings:', error);
-                    setGeneralSettingsError('Failed to fetch general settings.');
+                    setGeneralSettingsError(error.response?.data?.error || 'Failed to fetch general settings.');
                     setLoadingGeneralSettings(false);
                 });
         }
-    }, [tabValue, currentUser, token]);
+    }, [tabValue, currentUser, token, axiosConfig]);
 
     // Fetch Users
     useEffect(() => {
-        if (tabValue === 1 && currentUser?.role === 'admin') {
+        if (tabValue === 1 && currentUser?.role === 'admin' && token) {
             fetchUsers();
         }
-    }, [tabValue, currentUser, token]);
+    }, [tabValue, currentUser, token, axiosConfig]);
 
     const fetchUsers = () => {
         setLoadingUsers(true);
+        setUsersError('');
+
         axios.get(`${API_BASE_URL}/auth/users`, axiosConfig)
             .then(response => {
                 setUsers(response.data);
@@ -101,7 +104,7 @@ const SettingsPage = () => {
             })
             .catch(error => {
                 console.error('Error fetching users:', error);
-                setUsersError('Failed to fetch users.');
+                setUsersError(error.response?.data?.error || 'Failed to fetch users.');
                 setLoadingUsers(false);
             });
     };
@@ -139,7 +142,7 @@ const SettingsPage = () => {
             })
             .catch(error => {
                 console.error('Error saving general settings:', error);
-                setGeneralSettingsError(error.response?.data?.message || 'Failed to save settings.');
+                setGeneralSettingsError(error.response?.data?.error || 'Failed to save settings.');
                 setLoadingGeneralSettings(false);
             });
     };

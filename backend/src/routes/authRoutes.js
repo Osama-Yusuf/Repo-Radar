@@ -14,6 +14,9 @@ function setupAuthRoutes(authController) {
     // Get current user info (protected, any authenticated user)
     router.get('/me', verifyToken, (req, res) => authController.getCurrentUser(req, res));
 
+    // Verify user status (protected, any authenticated user)
+    router.get('/verify', verifyToken, (req, res) => authController.verifyUser(req, res));
+
     // --- Admin User Management Routes ---
     // List all users (admin only)
     router.get('/users', verifyToken, isAdmin, (req, res) => authController.listUsers(req, res));
@@ -26,7 +29,7 @@ function setupAuthRoutes(authController) {
 
     // Delete a user (admin only)
     router.delete('/users/:userId', verifyToken, isAdmin, (req, res) => authController.deleteUser(req, res));
-    
+
     return router;
 }
 

@@ -90,15 +90,27 @@ class AuthController {
     // Get current user info
     async getCurrentUser(req, res) {
         try {
-            // User info is attached to req by the auth middleware
-            return res.status(200).json({
-                id: req.user.id,
-                username: req.user.username,
-                role: req.user.role // Include role from req.user
-            });
+            const { id, username, role } = req.user;
+            return res.json({ id, username, role });
         } catch (error) {
             console.error('Error getting current user:', error);
-            return res.status(500).json({ error: 'Failed to get user information' });
+            return res.status(500).json({ error: 'Failed to get current user' });
+        }
+    }
+
+    // Verify user status and return current information
+    async verifyUser(req, res) {
+        try {
+            // req.user is already populated by the verifyToken middleware
+            // with the latest user data from the database
+            const { id, username, role } = req.user;
+            return res.json({
+                user: { id, username, role },
+                verified: true
+            });
+        } catch (error) {
+            console.error('Error verifying user:', error);
+            return res.status(500).json({ error: 'Failed to verify user' });
         }
     }
 
@@ -166,7 +178,7 @@ class AuthController {
             if (!newRole || !['user', 'admin'].includes(newRole)) {
                 return res.status(400).json({ error: "Invalid role. Must be 'user' or 'admin'" });
             }
-            
+
             const userIdNum = parseInt(userId, 10);
             if (isNaN(userIdNum)) {
                 return res.status(400).json({ error: 'Invalid user ID format' });

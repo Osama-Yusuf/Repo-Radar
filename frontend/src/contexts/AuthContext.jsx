@@ -12,19 +12,63 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [token, setToken] = useState(localStorage.getItem('token'));
 
     // Initialize authentication state from localStorage
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const storedToken = localStorage.getItem('token');
         const user = localStorage.getItem('user');
 
-        if (token && user) {
+        if (storedToken && user) {
+            setToken(storedToken);
             setCurrentUser(JSON.parse(user));
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+            // Verify user status immediately on load
+            verifyUserStatus(storedToken);
         }
 
         setLoading(false);
     }, []);
+
+    // Periodically verify user status (every 2 minutes)
+    useEffect(() => {
+        if (!token) return;
+
+        // Initial verification
+        verifyUserStatus(token);
+
+        // Set up periodic verification
+        const intervalId = setInterval(() => {
+            verifyUserStatus(token);
+        }, 2 * 60 * 1000); // 2 minutes
+
+        return () => clearInterval(intervalId);
+    }, [token]);
+
+    // Function to verify user status and update role if needed
+    const verifyUserStatus = async (currentToken) => {
+        if (!currentToken) return;
+
+        try {
+            const response = await axios.get(`${API_BASE_URL}/auth/verify`, {
+                headers: { Authorization: `Bearer ${currentToken}` }
+            });
+
+            // Update user information if it has changed
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            if (response.data.user && (storedUser.role !== response.data.user.role)) {
+                // Update localStorage and state with new user data
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+                setCurrentUser(response.data.user);
+            }
+        } catch (error) {
+            // If verification fails (user deleted or token invalid), log out
+            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                logout();
+            }
+        }
+    };
 
     // Register a new user
     const register = async (username, password) => {
@@ -62,6 +106,9 @@ export const AuthProvider = ({ children }) => {
             // Set authorization header for future requests
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
+            // Update token state
+            setToken(token);
+
             return user;
         } catch (err) {
             setError(err.response?.data?.error || 'Login failed');
@@ -80,6 +127,9 @@ export const AuthProvider = ({ children }) => {
 
         // Remove authorization header
         delete axios.defaults.headers.common['Authorization'];
+
+        // Clear token state
+        setToken(null);
     };
 
     // Check if user is authenticated
@@ -94,7 +144,8 @@ export const AuthProvider = ({ children }) => {
         register,
         login,
         logout,
-        isAuthenticated
+        isAuthenticated,
+        token // Expose token in the context
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
