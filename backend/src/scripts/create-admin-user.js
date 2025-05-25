@@ -1,6 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
-const { db } = require('../config/database');
+const { db } = require('../config/drizzle-client');
 const { users } = require('../schema/schema');
 const { eq, sql } = require('drizzle-orm');
 

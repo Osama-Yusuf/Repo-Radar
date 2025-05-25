@@ -133,15 +133,6 @@ async function setupDatabase() {
     `;
 
     await db.execute(createTables);
-
-    // Insert default row into app_settings
-    const insertDefaultAppSettings = sql`
-      INSERT INTO app_settings (id, github_api_url, github_token, kubernetes_namespaces)
-      VALUES (1, NULL, NULL, '[]')
-      ON CONFLICT (id) DO NOTHING;
-    `;
-    await db.execute(insertDefaultAppSettings);
-    
     console.log('Database setup completed successfully');
   } catch (error) {
     console.error('Error setting up database:', error);
