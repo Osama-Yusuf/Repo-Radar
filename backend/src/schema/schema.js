@@ -71,8 +71,25 @@ const users = pgTable('users', {
     id: serial('id').primaryKey(),
     username: varchar('username', { length: 50 }).notNull().unique(),
     password: text('password').notNull(), // Will store hashed passwords
+    role: varchar('role', { length: 10 }).notNull().default('user'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+// App Settings table
+const appSettings = pgTable('app_settings', {
+    id: serial('id').primaryKey(),
+    github_api_url: text('github_api_url'),
+    github_token: text('github_token'),
+    kubernetes_namespaces: jsonb('kubernetes_namespaces').default([]),
+    created_at: timestamp('created_at').defaultNow().notNull(),
+    updated_at: timestamp('updated_at').defaultNow().notNull()
+}, (table) => {
+    return {
+        // Ensure only one row can be inserted into app_settings
+        singleRowConstraint: unique().on(table.id), // This doesn't enforce id=1, Drizzle doesn't support CHECK constraints directly in schema
+        // A CHECK constraint like CHECK(id = 1) needs to be added manually in the database or via raw SQL migration.
+    };
 });
 
 // Tracked Images table
@@ -126,5 +143,6 @@ module.exports = {
     webhookParameters,
     users,
     tracked_images, // Updated export
-    image_vulnerabilities // Updated export
+    image_vulnerabilities, // Updated export
+    appSettings // Export app_settings table
 };

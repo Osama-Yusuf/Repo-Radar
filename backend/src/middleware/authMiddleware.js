@@ -32,8 +32,9 @@ const verifyToken = async (req, res, next) => {
 
             // Attach user info to request
             req.user = {
-                id: decoded.id,
-                username: decoded.username
+                id: user[0].id, // Use id from db record
+                username: user[0].username, // Use username from db record
+                role: user[0].role // Add role from db record
             };
 
             next();
@@ -47,5 +48,12 @@ const verifyToken = async (req, res, next) => {
 };
 
 module.exports = {
-    verifyToken
+    verifyToken,
+    isAdmin: (req, res, next) => {
+        if (req.user && req.user.role === 'admin') {
+            next();
+        } else {
+            res.status(403).json({ error: 'Forbidden. Administrator access required.' });
+        }
+    }
 };

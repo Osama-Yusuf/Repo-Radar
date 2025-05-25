@@ -1,4 +1,7 @@
 const { KubeConfig, CoreV1Api } = require('@kubernetes/client-node');
+const { db } = require('./drizzle-client'); // Import db
+const { appSettings } = require('../schema/schema'); // Import appSettings
+const { eq } = require('drizzle-orm'); // Import eq
 
 /**
  * @description Creates and returns a Kubernetes CoreV1Api client.
@@ -42,13 +45,36 @@ function getK8sClient() {
  * Logs the determined namespace.
  * @returns {string} The target Kubernetes namespace.
  */
-function getTargetNamespace() {
+async function getTargetNamespace() {
+  // Try to get namespaces from DB first
+  try {
+    const settingsResult = await db.select({ kubernetes_namespaces: appSettings.kubernetes_namespaces })
+                                   .from(appSettings)
+                                   .where(eq(appSettings.id, 1));
+
+    if (settingsResult.length > 0 && settingsResult[0].kubernetes_namespaces && settingsResult[0].kubernetes_namespaces.length > 0) {
+      // For now, if multiple namespaces are configured, we'll log a warning and use the first one.
+      // The ability to select a namespace or use all of them will be handled in specific API calls or UI.
+      if (settingsResult[0].kubernetes_namespaces.length > 1) {
+        console.warn(`Multiple Kubernetes namespaces configured in settings: ${settingsResult[0].kubernetes_namespaces.join(', ')}. Using the first one: ${settingsResult[0].kubernetes_namespaces[0]}`);
+      }
+      console.log(`Using target namespace from DB settings: ${settingsResult[0].kubernetes_namespaces[0]}`);
+      return settingsResult[0].kubernetes_namespaces[0];
+    }
+  } catch (dbError) {
+    console.error('Failed to fetch Kubernetes namespaces from database:', dbError);
+    // Proceed to fallback mechanisms if DB fetch fails
+  }
+
+  // Fallback to environment variable
   const namespaceFromEnv = process.env.K8S_TARGET_NAMESPACE;
   if (namespaceFromEnv && namespaceFromEnv.trim() !== '') {
     console.log(`Using target namespace from K8S_TARGET_NAMESPACE: ${namespaceFromEnv}`);
     return namespaceFromEnv.trim();
   }
-  console.log('K8S_TARGET_NAMESPACE not set or empty, using default namespace: "default"');
+
+  // Fallback to 'default' namespace
+  console.log('K8S_TARGET_NAMESPACE not set or empty, and no valid namespace in DB settings. Using default namespace: "default"');
   return 'default';
 }
 

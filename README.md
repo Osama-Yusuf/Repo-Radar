@@ -84,6 +84,46 @@ Get the most out of Repo-Radar with these advanced tips:
   - Real-time status updates
   - Comprehensive activity logs
 
+## ⚙️ Configuration & Administration
+
+Repo Radar now includes enhanced configuration options and role-based access control for better security and manageability.
+
+### <g-emoji alias="gear" fallback-src="https://github.githubassets.com/images/icons/emoji/unicode/2699.png">⚙️</g-emoji> Settings Page
+
+Administrators can access the new **Settings** page via the sidebar. This page allows for centralized management of critical application configurations:
+
+*   **GitHub Integration:** Configure the GitHub API URL and Personal Access Token directly in the UI. This is now the primary way to set these credentials.
+*   **Kubernetes Monitoring:** Define the target Kubernetes namespaces that Repo Radar should monitor. You can specify one or more namespaces.
+
+**Environment Variable Fallback:**
+
+While the Settings page is the primary source for these configurations, the application still supports environment variable fallbacks:
+*   `GITHUB_API_URL`: If not set in UI, the backend will check this environment variable.
+*   `GITHUB_TOKEN`: If not set in UI, the backend will check this environment variable.
+*   `K8S_TARGET_NAMESPACE`: If no namespaces are configured in the UI, the backend will check this environment variable (for a single namespace), and finally default to `default` if neither UI nor ENV var is set.
+
+It's recommended to use the Settings page for managing these values after initial setup.
+
+### 🔑 Role-Based Access Control (RBAC)
+
+Repo Radar implements a two-tier role system to manage user permissions:
+
+*   **Admin (`admin`):**
+    *   Full access to all application features.
+    *   Can access and modify configurations on the **Settings page**.
+    *   Manages users:
+        *   Create new users (both 'admin' and 'user' roles).
+        *   Assign/change user roles.
+        *   Delete users.
+    *   Can manage all projects, actions, and view all logs.
+
+*   **User (`user`):**
+    *   Standard access to application features like viewing repositories, pod statuses, pipeline statuses, and vulnerabilities.
+    *   Can manage projects and actions they have appropriate permissions for (based on future enhancements, currently all users can manage all projects).
+    *   Cannot access the Settings page or perform user management tasks.
+
+The first user registered in the application can be promoted to 'admin' via backend scripts or direct database modification if needed (see `backend/src/scripts/setup-db.js` for initial user setup guidance or future admin promotion scripts).
+
 ## 🚀 Quick Start
 
 ### 🐳 Installation Using Docker

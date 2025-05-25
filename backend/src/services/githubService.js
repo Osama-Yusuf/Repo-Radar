@@ -1,17 +1,19 @@
 const { Octokit } = require('@octokit/rest');
 const axios = require('axios');
 const https = require('https');
+const { db } = require('../config/drizzle-client'); // Import db
+const { appSettings } = require('../schema/schema'); // Import appSettings
+const { eq } = require('drizzle-orm'); // Import eq
 
 class GitHubService {
-    constructor() {
-        const baseUrl = process.env.GITHUB_API_URL;
-        if (!baseUrl) {
-            throw new Error('GITHUB_API_URL environment variable is required');
+    constructor(settings) { // Accept settings as a parameter
+        if (!settings || !settings.github_api_url || !settings.github_token) {
+            throw new Error('GitHub API URL and Token are required from settings');
         }
 
-        this.baseUrl = baseUrl;
+        this.baseUrl = settings.github_api_url;
         this.octokit = new Octokit({
-            auth: process.env.GITHUB_TOKEN,
+            auth: settings.github_token,
             userAgent: 'repo-radar v1.0',
             baseUrl: this.baseUrl,
             request: {
@@ -128,4 +130,31 @@ class GitHubService {
     }
 }
 
-module.exports = new GitHubService();
+    }
+}
+
+// Asynchronous initialization function
+async function createGitHubService() {
+    const settingsResult = await db.select().from(appSettings).where(eq(appSettings.id, 1));
+    if (settingsResult.length === 0) {
+        // console.warn('GitHub settings not found in database. GitHubService will not be functional.');
+        // return null; // Or throw an error, depending on how critical this is at startup
+        throw new Error('GitHub settings not found in database. Cannot initialize GitHubService.');
+    }
+    const { github_api_url, github_token } = settingsResult[0];
+
+    if (!github_api_url || !github_token) {
+        // console.warn('GitHub API URL or Token is missing in settings. GitHubService will not be functional.');
+        // return null;
+        throw new Error('GitHub API URL or Token is missing in settings. Cannot initialize GitHubService.');
+    }
+
+    return new GitHubService({ github_api_url, github_token });
+}
+
+// Export a promise that resolves to the service instance
+module.exports = createGitHubService();
+// This makes the module export a Promise. 
+// Other modules importing it will need to use .then() or await.
+// Example: const gitHubService = await require('./services/githubService');
+// Or: require('./services/githubService').then(service => { /* use service */ });

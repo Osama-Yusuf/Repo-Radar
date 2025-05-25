@@ -17,7 +17,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import PodStatus from './pages/PodStatus';
 import PipelineStatus from './pages/PipelineStatus';
 import AuthPage from './pages/AuthPage';
-import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities'; // Import the new page
+import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities';
+import SettingsPage from './pages/SettingsPage'; // Import SettingsPage
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -684,7 +685,7 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              <Route path="/vulnerabilities" element={ // Add new route for vulnerabilities
+              <Route path="/vulnerabilities" element={
                 <ProtectedRoute>
                   <>
                     <SideNav />
@@ -695,6 +696,24 @@ function App() {
                         isRefreshing={refreshing} // Or relevant state
                       />
                       <DeploymentVulnerabilities />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                       {/* Minimal Header for settings, or customize as needed */}
+                      <Header 
+                        onRefresh={() => {}} // No global refresh, settings page handles its own data
+                        onAddProject={() => {}} // No add project button on settings
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
+                      />
+                      <SettingsPage />
                     </Box>
                   </>
                 </ProtectedRoute>

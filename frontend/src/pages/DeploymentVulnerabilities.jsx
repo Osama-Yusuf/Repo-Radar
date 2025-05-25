@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // Added useContext
 import axios from 'axios';
-import { Container, Typography, CircularProgress, Box, Alert } from '@mui/material';
-import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard'; // Import the card
+import { Container, Typography, CircularProgress, Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material'; // Added FormControl, InputLabel, Select, MenuItem
+import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard';
+import { AuthContext } from '../contexts/AuthContext'; // Import AuthContext for token
 
 // Corrected API_BASE_URL definition using Vite environment variables
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
+
+// Create a dedicated axios instance for this component
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
 
 /**
  * @component DeploymentVulnerabilities
@@ -17,37 +23,78 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:
  * an error message (using MUI Alert) if this fetch operation fails.
  */
 const DeploymentVulnerabilities = () => {
-  // State: deployments - Stores the array of deployment objects fetched from the API.
   const [deployments, setDeployments] = useState([]);
-  // State: loading - Boolean indicating if the initial list of deployments is being fetched.
   const [loading, setLoading] = useState(true);
-  // State: error - Stores any error object or message if fetching deployments fails.
   const [error, setError] = useState(null);
+  const { token } = useContext(AuthContext); // Get token
 
-  // useEffect: Fetches the list of deployments when the component mounts.
-  // It sets the loading state, makes an API call, and updates either
-  // the deployments state on success or the error state on failure.
+  const [availableNamespaces, setAvailableNamespaces] = useState([]);
+  const [selectedNamespace, setSelectedNamespace] = useState('');
+
+  // Add Authorization header interceptor for apiClient
   useEffect(() => {
-    const fetchDeployments = async () => {
+    const interceptor = apiClient.interceptors.request.use(
+      config => {
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      error => Promise.reject(error)
+    );
+    return () => {
+      apiClient.interceptors.request.eject(interceptor);
+    };
+  }, [token]);
+
+  // Fetch available namespaces from settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!token) return;
       try {
-        setLoading(true); // Indicate that data loading has started.
-        setError(null); // Reset any previous errors.
-        const response = await axios.get(`${API_BASE_URL}/k8s/deployments-with-images`);
-        setDeployments(response.data); // Store the fetched deployments.
+        const response = await apiClient.get('/settings');
+        if (response.data && response.data.kubernetes_namespaces && response.data.kubernetes_namespaces.length > 0) {
+          setAvailableNamespaces(response.data.kubernetes_namespaces);
+          setSelectedNamespace(response.data.kubernetes_namespaces[0]);
+        } else {
+          setAvailableNamespaces(['default']);
+          setSelectedNamespace('default');
+        }
+      } catch (error) {
+        console.error('Error fetching settings for namespaces:', error);
+        setAvailableNamespaces(['default']);
+        setSelectedNamespace('default');
+        // Consider setting an error state here if namespace fetching is critical
+      }
+    };
+    fetchSettings();
+  }, [token]);
+
+  // Fetch deployments when selectedNamespace changes
+  useEffect(() => {
+    const fetchDeployments = async (namespace) => {
+      if (!namespace || !token) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await apiClient.get(`/k8s/deployments-with-images?namespace=${namespace}`);
+        setDeployments(response.data);
       } catch (err) {
         console.error("Error fetching deployments:", err);
-        // Set a user-friendly error message, preferring backend's message if available.
         setError(err.response?.data?.message || err.message || 'Failed to fetch deployments');
+        setDeployments([]); // Clear data on error
       } finally {
-        setLoading(false); // Indicate that data loading has finished.
+        setLoading(false);
       }
     };
 
-    fetchDeployments();
-  }, []); // Empty dependency array ensures this effect runs only once on mount.
+    if (selectedNamespace) {
+      fetchDeployments(selectedNamespace);
+      // No interval refresh for deployments for now, can be added if needed
+    }
+  }, [selectedNamespace, token]);
 
-  // Conditional Rendering: Display a loading spinner while data is being fetched.
-  if (loading) {
+  if (loading && deployments.length === 0) { // Show loading only if there are no deployments yet
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
@@ -68,14 +115,53 @@ const DeploymentVulnerabilities = () => {
 
   return (
     <Container sx={{ mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Deployment Vulnerabilities
-      </Typography>
-      {deployments.length === 0 && !loading && (
-        <Typography sx={{ textAlign: 'center', mt: 5 }}>No deployments found.</Typography>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" gutterBottom>
+          Deployment Vulnerabilities
+        </Typography>
+        {availableNamespaces.length > 0 && (
+          <FormControl sx={{ m: 1, minWidth: 200 }} size="small">
+            <InputLabel id="namespace-select-label-vuln" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>Namespace</InputLabel>
+            <Select
+              labelId="namespace-select-label-vuln"
+              value={selectedNamespace}
+              label="Namespace"
+              onChange={(e) => setSelectedNamespace(e.target.value)}
+              sx={{ 
+                // Assuming a light theme for this page based on typical Material-UI defaults
+                // If your app has a dark theme, adjust these colors
+                color: 'black', 
+                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.23)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.87)' },
+                '.MuiSvgIcon-root': { color: 'rgba(0, 0, 0, 0.54)' },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    // Standard dropdown appearance
+                  },
+                },
+              }}
+            >
+              {availableNamespaces.map((ns) => (
+                <MenuItem key={ns} value={ns}>{ns}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+      </Box>
+      {loading && <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 2, mb: 2 }} />}
+      {!loading && deployments.length === 0 && (
+        <Typography sx={{ textAlign: 'center', mt: 5 }}>
+          No deployments found in namespace: {selectedNamespace || 'N/A'}.
+        </Typography>
       )}
       {deployments.map((deployment) => (
-        <DeploymentVulnerabilityCard key={deployment.deploymentName} deployment={deployment} />
+        <DeploymentVulnerabilityCard 
+          key={`${deployment.namespace}-${deployment.deploymentName}`} 
+          deployment={deployment} 
+          selectedNamespace={selectedNamespace} // Pass selectedNamespace if card needs it
+        />
       ))}
     </Container>
   );

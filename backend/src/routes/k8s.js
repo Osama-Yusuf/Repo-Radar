@@ -5,6 +5,10 @@ const util = require('util');
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
+const { getTargetNamespace } = require('../config/k8s-client'); // Import getTargetNamespace
+
+const kc = new k8s.KubeConfig();
+kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const appsV1Api = kc.makeApiClient(k8s.AppsV1Api); // Import AppsV1Api
 const metricsApi = kc.makeApiClient(k8s.CustomObjectsApi);
@@ -65,13 +69,13 @@ function convertMemoryToMi(memString) {
   return `${mi}Mi`;
 }
 
-async function getPodMetrics() {
+async function getPodMetrics(namespace) { // Accept namespace as a parameter
   try {
     const metrics = new Map();
     const metricsResponse = await metricsApi.getNamespacedCustomObject(
       'metrics.k8s.io',
       'v1beta1',
-      'default',
+      namespace, // Use the provided namespace
       'pods',
       ''
     );
@@ -101,11 +105,16 @@ async function getPodMetrics() {
   }
 }
 
-// Get pod status in default namespace
+// Get pod status in the target namespace
 router.get('/pods', async (req, res) => {
   try {
-    const response = await k8sApi.listNamespacedPod('default');
-    const podMetrics = await getPodMetrics();
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+    
+    console.log(`Fetching pods for namespace: ${namespaceToUse}`);
+
+    const response = await k8sApi.listNamespacedPod(namespaceToUse);
+    const podMetrics = await getPodMetrics(namespaceToUse);
 
     const pods = response.body.items.map(pod => {
       const metrics = podMetrics.get(pod.metadata.name) || {};
@@ -155,7 +164,12 @@ router.get('/pods', async (req, res) => {
 // Get deployments with image information
 router.get('/deployments-with-images', async (req, res) => {
   try {
-    const response = await appsV1Api.listNamespacedDeployment('default');
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+
+    console.log(`Fetching deployments for namespace: ${namespaceToUse}`);
+
+    const response = await appsV1Api.listNamespacedDeployment(namespaceToUse);
     const deployments = response.body.items.map(deployment => {
       const firstContainer = deployment.spec.template.spec.containers?.[0];
       const imageName = firstContainer?.image || null;
@@ -178,9 +192,14 @@ router.get('/deployments-with-images', async (req, res) => {
 // Get logs for a specific pod
 router.get('/pods/:name/logs', async (req, res) => {
   try {
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+
+    console.log(`Fetching logs for pod ${req.params.name} in namespace: ${namespaceToUse}`);
+    
     const response = await k8sApi.readNamespacedPodLog(
       req.params.name,
-      'default',
+      namespaceToUse, 
       undefined,
       false,
       undefined,

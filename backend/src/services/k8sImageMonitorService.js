@@ -8,13 +8,12 @@ const { scanImage } = require('./trivyScanService'); // Import scanImage
 const STALE_SCAN_THRESHOLD_DAYS = 7;
 
 let k8sClient;
-let targetNamespace;
+// targetNamespace will be fetched asynchronously
 
-// Initialize Kubernetes client and namespace
+// Initialize Kubernetes client
 try {
   k8sClient = getK8sClient();
-  targetNamespace = getTargetNamespace();
-  console.log(`Kubernetes Image Monitor Service initialized for namespace: "${targetNamespace}"`);
+  console.log('Kubernetes client initialized for image monitoring.');
 } catch (error) {
   console.error('Failed to initialize Kubernetes client for image monitoring:', error);
   // k8sClient will be undefined, and monitoring functions should handle this.
@@ -78,13 +77,19 @@ async function getRunningImages() {
     return [];
   }
 
-  console.log(`Fetching running images from namespace: "${targetNamespace}"...`);
+  const currentTargetNamespace = await getTargetNamespace(); // Fetch namespace
+  if (!currentTargetNamespace) {
+    console.error('Target namespace could not be determined. Cannot fetch running images.');
+    return [];
+  }
+
+  console.log(`Fetching running images from namespace: "${currentTargetNamespace}"...`);
   const uniqueImages = new Map(); // Using a Map to store unique images based on a composite key
 
   try {
-    const res = await k8sClient.listNamespacedPod(targetNamespace);
+    const res = await k8sClient.listNamespacedPod(currentTargetNamespace);
     const pods = res.body.items;
-    console.log(`Found ${pods.length} pods in namespace "${targetNamespace}".`);
+    console.log(`Found ${pods.length} pods in namespace "${currentTargetNamespace}".`);
 
     for (const pod of pods) {
       const podName = pod.metadata.name;
@@ -142,13 +147,13 @@ async function getRunningImages() {
       });
     }
   } catch (error) {
-    console.error(`Error fetching or processing pods from namespace "${targetNamespace}":`, error.message, error.stack ? `\nStack: ${error.stack}` : '');
+    console.error(`Error fetching or processing pods from namespace "${currentTargetNamespace}":`, error.message, error.stack ? `\nStack: ${error.stack}` : '');
     // Rethrow or handle as per application's error handling strategy
     throw error; // Rethrowing to be caught by monitoringTick or calling function
   }
 
   const resultList = Array.from(uniqueImages.values());
-  console.log(`Found ${resultList.length} unique images running in namespace "${targetNamespace}".`);
+  console.log(`Found ${resultList.length} unique images running in namespace "${currentTargetNamespace}".`);
   return resultList;
 }
 
@@ -156,13 +161,19 @@ async function getRunningImages() {
  * Starts a polling mechanism to periodically fetch and log running Kubernetes images.
  * @param {number} intervalMs - The interval in milliseconds for polling. Defaults to 60000ms (1 minute).
  */
-function startMonitoring(intervalMs = 60000) {
+async function startMonitoring(intervalMs = 60000) { // Make startMonitoring async
   if (!k8sClient) {
     console.warn('Kubernetes client not initialized. Monitoring will not start.');
     return;
   }
 
-  console.log(`Starting Kubernetes image monitoring for namespace "${targetNamespace}" with interval ${intervalMs}ms.`);
+  const currentTargetNamespace = await getTargetNamespace(); // Fetch namespace at the start
+  if (!currentTargetNamespace) {
+    console.error('Target namespace could not be determined. Monitoring will not start.');
+    return;
+  }
+
+  console.log(`Starting Kubernetes image monitoring for namespace "${currentTargetNamespace}" with interval ${intervalMs}ms.`);
 
   const monitoringTick = async () => {
     console.log('Image monitoring tick started...');
@@ -170,12 +181,20 @@ function startMonitoring(intervalMs = 60000) {
       console.warn('Kubernetes client not available, skipping Kubernetes discovery part of monitoring tick.');
       // Allow scanPendingImages to run even if K8s client fails, as pending images might be from previous discovery
     } else {
-      try {
-        const discoveredImages = await getRunningImages();
-        console.log(`Discovered ${discoveredImages.length} unique images in namespace "${targetNamespace}".`);
+      const currentTickNamespace = await getTargetNamespace(); // Re-fetch in case it changed
+      if (!currentTickNamespace) {
+        console.error('Target namespace could not be determined for this tick. Skipping K8s discovery.');
+      } else {
+        try {
+          const discoveredImages = await getRunningImages(); // getRunningImages now fetches its own namespace
+          console.log(`Discovered ${discoveredImages.length} unique images in namespace "${currentTickNamespace}".`);
 
-        for (const image of discoveredImages) {
-          await processDiscoveredImage(image); // This marks images as 'pending' if new or needing rescan
+          for (const image of discoveredImages) {
+            await processDiscoveredImage(image); // This marks images as 'pending' if new or needing rescan
+          }
+        } catch (error) {
+          console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
+        }
         }
       } catch (error) {
         console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');

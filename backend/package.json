@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push:pg",
     "db:drop": "drizzle-kit drop",
-    "setup:auth": "node setup-auth.js"
+    "setup:auth": "node setup-auth.js",
+    "test": "jest --runInBand --detectOpenHandles backend/tests"
   },
   "dependencies": {
     "@kubernetes/client-node": "^0.20.0",
@@ -33,6 +34,17 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "./tests/setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/"
+    ]
   }
 }

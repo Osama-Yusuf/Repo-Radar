@@ -1,7 +1,7 @@
 const util = require('util');
 const fs = require('fs').promises;
 const exec = util.promisify(require('child_process').exec);
-const githubService = require('./githubService');
+const githubServicePromise = require('./githubService'); // Renamed to indicate it's a promise
 const axios = require('axios');
 const path = require('path');
 const os = require('os');
@@ -14,6 +14,23 @@ class ProjectService {
         this.db = dbInstance || db; // Use provided db instance or default to the imported one
         this.projectTimers = new Map();
         this.projectCache = new Map();
+        this.githubService = null; // Will be initialized in an async method
+    }
+
+    async initialize() {
+        try {
+            this.githubService = await githubServicePromise;
+            if (!this.githubService) {
+                console.error('Failed to initialize GitHubService in ProjectService. GitHub related features will not work.');
+                // Optionally, you could throw an error here to prevent the app from starting
+                // or set a flag to disable GitHub-dependent functionality.
+            } else {
+                console.log('GitHubService initialized successfully in ProjectService.');
+            }
+        } catch (error) {
+            console.error('Error initializing GitHubService in ProjectService:', error);
+            // Handle error appropriately, e.g., by setting this.githubService to null or re-throwing
+        }
     }
 
     async setupProjectTimer(project) {
@@ -222,9 +239,15 @@ class ProjectService {
                     if (!repoUrl) {
                         throw new Error('Repository URL is missing');
                     }
+                    
+                    if (!this.githubService) {
+                        console.warn(`GitHubService not initialized. Skipping check for project ${project.name}, branch ${branch.branchName}.`);
+                        await this.logCheckError(project.id, new Error('GitHubService not available'), branch.branchName);
+                        continue; // Skip to the next branch
+                    }
 
                     console.log(`Checking branch ${branch.branchName} (Current SHA: ${branch.lastCommitSha || 'none'})`);
-                    const branchDetails = await githubService.getBranchDetails(repoUrl, branch.branchName);
+                    const branchDetails = await this.githubService.getBranchDetails(repoUrl, branch.branchName);
                     if (!branchDetails) {
                         throw new Error('No branch details returned from GitHub');
                     }
@@ -433,6 +456,17 @@ class ProjectService {
     }
 
     async initializeProjectTimers() {
+        // Ensure GitHubService is initialized before setting up timers
+        if (!this.githubService) {
+            await this.initialize(); // Ensure this is called if not already
+        }
+
+        // If still not initialized (e.g. due to error), log and potentially abort/limit functionality
+        if (!this.githubService) {
+            console.error('Cannot initialize project timers because GitHubService failed to initialize.');
+            return;
+        }
+
         try {
             const projects = await this.db.select().from(schema.projects);
             for (const project of projects) {
