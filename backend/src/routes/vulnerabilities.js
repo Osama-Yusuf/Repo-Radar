@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/drizzle-client');
 const { tracked_images, image_vulnerabilities } = require('../schema/schema');
 const { eq, and, isNull, desc, sql } = require('drizzle-orm');
+const { processDiscoveredImage } = require('../services/k8sImageMonitorService');
 
 /**
  * @route GET /api/vulnerabilities/scan/:imageName
@@ -44,10 +45,36 @@ router.get('/scan/:imageName', async (req, res) => {
             .execute();
 
         if (!trackedImage || trackedImage.length === 0) {
-            return res.status(404).json({
-                message: `Image ${imageName} not found in database`,
-                imageDetails: { name, tag }
-            });
+            // Image not found in database - trigger an on-demand scan
+            console.log(`Image ${imageName} not found in database. Triggering on-demand scan.`);
+
+            try {
+                // Create a discovery object in the format expected by processDiscoveredImage
+                const discoveryObject = {
+                    name: name,
+                    tag: tag,
+                    digest: null,
+                    podName: 'on-demand-scan',
+                    containerName: 'on-demand-scan'
+                };
+
+                // Process the image (this will add it to the database and queue it for scanning)
+                await processDiscoveredImage(discoveryObject);
+
+                // Return a response indicating the scan has been triggered
+                return res.status(202).json({
+                    message: `Image ${imageName} has been queued for scanning. Please check back in a few minutes.`,
+                    imageDetails: { name, tag },
+                    status: 'pending'
+                });
+            } catch (scanError) {
+                console.error(`Error triggering scan for ${imageName}:`, scanError);
+                return res.status(500).json({
+                    message: `Error triggering scan for ${imageName}`,
+                    imageDetails: { name, tag },
+                    error: scanError.message
+                });
+            }
         }
 
         const image = trackedImage[0];
@@ -68,16 +95,16 @@ router.get('/scan/:imageName', async (req, res) => {
                 lastScanned: image.last_scanned_at,
                 scanStatus: image.scan_status
             },
-            vulnerabilities: vulnerabilities.map(vuln => ({
-                id: vuln.id,
-                cveId: vuln.vulnerability_cve_id,
-                packageName: vuln.pkgName,
-                installedVersion: vuln.installedVersion,
-                fixedVersion: vuln.fixedVersion,
-                severity: vuln.severity,
-                title: vuln.title,
-                description: vuln.description,
-                datasource: vuln.datasource
+            vulnerabilities: vulnerabilities.map(v => ({
+                id: v.id,
+                cveId: v.vulnerability_cve_id,
+                packageName: v.pkg_name,
+                installedVersion: v.installed_version,
+                fixedVersion: v.fixed_version,
+                severity: v.severity,
+                title: v.title,
+                description: v.description,
+                datasource: v.datasource
             })),
             summary: {
                 total: vulnerabilities.length,
@@ -91,8 +118,8 @@ router.get('/scan/:imageName', async (req, res) => {
 
         return res.json(response);
     } catch (error) {
-        console.error('Error fetching vulnerabilities:', error);
-        return res.status(500).json({ message: 'Error fetching vulnerabilities', error: error.message });
+        console.error('Error fetching vulnerability data:', error);
+        return res.status(500).json({ message: 'Error fetching vulnerability data', error: error.message });
     }
 });
 
