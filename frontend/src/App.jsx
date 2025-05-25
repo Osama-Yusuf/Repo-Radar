@@ -12,6 +12,7 @@ import ProjectDialog from './components/projects/ProjectDialog';
 import ActionDialog from './components/actions/ActionDialog';
 import LogsDialog from './components/logs/LogsDialog';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AdminRoute from './components/auth/AdminRoute'; // Import AdminRoute
 
 // Pages
 import PodStatus from './pages/PodStatus';
@@ -691,9 +692,10 @@ function App() {
                     <SideNav />
                     <Box sx={{ flex: 1, ml: '80px' }}>
                       <Header
-                        onRefresh={() => fetchProjects(true)} // Or a relevant refresh function
-                        onAddProject={() => handleOpenDialog()} // Or relevant action
-                        isRefreshing={refreshing} // Or relevant state
+                        onRefresh={() => { }} // No global refresh, settings page handles its own data
+                        onAddProject={() => { }} // No add project button on settings
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
                       />
                       <DeploymentVulnerabilities />
                     </Box>
@@ -702,21 +704,21 @@ function App() {
               } />
 
               <Route path="/settings" element={
-                <ProtectedRoute>
+                <AdminRoute>
                   <>
                     <SideNav />
                     <Box sx={{ flex: 1, ml: '80px' }}>
-                       {/* Minimal Header for settings, or customize as needed */}
-                      <Header 
-                        onRefresh={() => {}} // No global refresh, settings page handles its own data
-                        onAddProject={() => {}} // No add project button on settings
+                      {/* Minimal Header for settings, or customize as needed */}
+                      <Header
+                        onRefresh={() => { }} // No global refresh, settings page handles its own data
+                        onAddProject={() => { }} // No add project button on settings
                         isRefreshing={false}
                         showAddProjectButton={false} // Hide add project button
                       />
                       <SettingsPage />
                     </Box>
                   </>
-                </ProtectedRoute>
+                </AdminRoute>
               } />
 
               <Route path="*" element={<Navigate to="/" replace />} />

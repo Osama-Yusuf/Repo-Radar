@@ -195,9 +195,6 @@ async function startMonitoring(intervalMs = 60000) { // Make startMonitoring asy
         } catch (error) {
           console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
         }
-        }
-      } catch (error) {
-        console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
       }
     }
 

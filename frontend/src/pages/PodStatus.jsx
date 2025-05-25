@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react'; // Added useCont
 import { Container, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box } from '@mui/material'; // Added FormControl, InputLabel, Select, MenuItem, Box
 import axios from 'axios';
 import { useSearch } from '../contexts/SearchContext';
-import { AuthContext } from '../contexts/AuthContext'; // Import AuthContext for token
+import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
 // Import our modular components
 import PodList from '../components/pod/PodList';
@@ -48,7 +48,7 @@ const PodStatus = () => {
       apiClient.interceptors.request.eject(interceptor);
     };
   }, [token]);
-  
+
   // Fetch available namespaces from settings
   useEffect(() => {
     const fetchSettings = async () => {
@@ -150,8 +150,8 @@ const PodStatus = () => {
               value={selectedNamespace}
               label="Namespace"
               onChange={(e) => setSelectedNamespace(e.target.value)}
-              sx={{ 
-                color: 'white', 
+              sx={{
+                color: 'white',
                 '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' },
                 '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.5)' },
                 '.MuiSvgIcon-root': { color: 'rgba(255, 255, 255, 0.7)' },

@@ -130,9 +130,6 @@ class GitHubService {
     }
 }
 
-    }
-}
-
 // Asynchronous initialization function
 async function createGitHubService() {
     const settingsResult = await db.select().from(appSettings).where(eq(appSettings.id, 1));

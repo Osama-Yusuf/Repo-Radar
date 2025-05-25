@@ -2,7 +2,7 @@ require('dotenv').config();
 const bcrypt = require('bcrypt');
 const { db } = require('../config/database');
 const { users } = require('../schema/schema');
-const { eq } = require('drizzle-orm');
+const { eq, sql } = require('drizzle-orm');
 
 /**
  * Script to create a new user (admin only)
@@ -13,6 +13,23 @@ const { eq } = require('drizzle-orm');
 
 async function createUser() {
     try {
+        // Check if role column exists and add it if it doesn't
+        try {
+            // Try to query the role column to see if it exists
+            await db.execute(sql`SELECT role FROM users LIMIT 1`);
+            console.log('Role column exists in users table');
+        } catch (error) {
+            // If error contains "column does not exist", add the column
+            if (error.message.includes('column "role" does not exist')) {
+                console.log('Role column does not exist, adding it...');
+                await db.execute(sql`ALTER TABLE users ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'user'`);
+                console.log('Role column added successfully');
+            } else {
+                // If it's a different error, just log it and continue
+                console.warn('Error checking role column:', error.message);
+            }
+        }
+
         // Get username and password from command line arguments
         const args = process.argv.slice(2);
 
@@ -46,10 +63,11 @@ async function createUser() {
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        // Create user in database
+        // Create user in database with 'user' role
         const result = await db.insert(users).values({
             username,
-            password: hashedPassword
+            password: hashedPassword,
+            role: 'user'
         }).returning();
 
         console.log(`User '${username}' created successfully.`);

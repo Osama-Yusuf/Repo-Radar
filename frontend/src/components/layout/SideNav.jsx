@@ -9,7 +9,7 @@ import {
   Security as SecurityIcon,
   Settings as SettingsIcon // Import SettingsIcon
 } from '@mui/icons-material';
-import { AuthContext } from '../../context/AuthContext'; // Import AuthContext
+import AuthContext from '../../contexts/AuthContext';
 
 const baseNavItems = [
   { path: '/', label: 'Repositories', icon: <SourceIcon /> },
@@ -20,11 +20,11 @@ const baseNavItems = [
 
 const SideNav = () => {
   const location = useLocation();
-  const { user } = useContext(AuthContext); // Get user from AuthContext
+  const { currentUser } = useContext(AuthContext); // Get currentUser from AuthContext
 
   const navItems = [
     ...baseNavItems,
-    ...(user && user.role === 'admin'
+    ...(currentUser && currentUser.role === 'admin'
       ? [{ path: '/settings', label: 'Settings', icon: <SettingsIcon /> }]
       : []),
   ];

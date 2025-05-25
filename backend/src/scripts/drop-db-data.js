@@ -2,7 +2,7 @@ require('dotenv').config();
 const { db } = require('../config/drizzle-client');
 const { sql } = require('drizzle-orm');
 
-const excludedTables = ['users'];
+const excludedTables = [''];
 
 const schema = require('../schema/schema');
 

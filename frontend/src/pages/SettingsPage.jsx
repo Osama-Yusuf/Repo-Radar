@@ -5,9 +5,10 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext'; // Assuming AuthContext is here
+import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+const PORT = import.meta.env.VITE_PORT || '3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
 function TabPanel(props) {
     const { children, value, index, ...other } = props;
@@ -30,7 +31,7 @@ function TabPanel(props) {
 
 const SettingsPage = () => {
     const [tabValue, setTabValue] = useState(0);
-    const { user, token } = useContext(AuthContext); // Get user role and token
+    const { currentUser, token } = useContext(AuthContext); // Get currentUser role and token
 
     // General Settings State
     const [generalSettings, setGeneralSettings] = useState({
@@ -54,7 +55,7 @@ const SettingsPage = () => {
     const [openCreateUserDialog, setOpenCreateUserDialog] = useState(false);
     const [openEditUserDialog, setOpenEditUserDialog] = useState(false);
     const [openDeleteUserDialog, setOpenDeleteUserDialog] = useState(false);
-    
+
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [currentUserToDelete, setCurrentUserToDelete] = useState(null);
 
@@ -68,7 +69,7 @@ const SettingsPage = () => {
 
     // Fetch General Settings
     useEffect(() => {
-        if (tabValue === 0 && user?.role === 'admin') {
+        if (tabValue === 0 && currentUser?.role === 'admin') {
             setLoadingGeneralSettings(true);
             axios.get(`${API_BASE_URL}/settings`, axiosConfig)
                 .then(response => {
@@ -82,14 +83,14 @@ const SettingsPage = () => {
                     setLoadingGeneralSettings(false);
                 });
         }
-    }, [tabValue, user, token]);
+    }, [tabValue, currentUser, token]);
 
     // Fetch Users
     useEffect(() => {
-        if (tabValue === 1 && user?.role === 'admin') {
+        if (tabValue === 1 && currentUser?.role === 'admin') {
             fetchUsers();
         }
-    }, [tabValue, user, token]);
+    }, [tabValue, currentUser, token]);
 
     const fetchUsers = () => {
         setLoadingUsers(true);
@@ -104,7 +105,7 @@ const SettingsPage = () => {
                 setLoadingUsers(false);
             });
     };
-    
+
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
         setGeneralSettingsError('');
@@ -224,7 +225,7 @@ const SettingsPage = () => {
     };
 
 
-    if (user?.role !== 'admin') {
+    if (currentUser?.role !== 'admin') {
         return (
             <Paper sx={{ p: 2 }}>
                 <Typography variant="h6" color="error">Access Denied</Typography>
@@ -290,7 +291,7 @@ const SettingsPage = () => {
                 {loadingUsers && <CircularProgress />}
                 {usersError && <Alert severity="error" sx={{ mb: 2 }}>{usersError}</Alert>}
                 {usersSuccess && <Alert severity="success" sx={{ mb: 2 }}>{usersSuccess}</Alert>}
-                
+
                 <TableContainer component={Paper}>
                     <Table sx={{ minWidth: 650 }} aria-label="simple table">
                         <TableHead>
@@ -310,10 +311,10 @@ const SettingsPage = () => {
                                     <TableCell>{new Date(u.createdAt).toLocaleString()}</TableCell>
                                     <TableCell>{new Date(u.updatedAt).toLocaleString()}</TableCell>
                                     <TableCell>
-                                        <Button size="small" onClick={() => handleEditUserDialogOpen(u)} sx={{ mr: 1 }} disabled={u.id === user.id && u.role === 'admin' && users.filter(adm => adm.role === 'admin').length === 1}>
+                                        <Button size="small" onClick={() => handleEditUserDialogOpen(u)} sx={{ mr: 1 }} disabled={u.id === currentUser.id && u.role === 'admin' && users.filter(adm => adm.role === 'admin').length === 1}>
                                             Edit Role
                                         </Button>
-                                        <Button size="small" color="error" onClick={() => handleDeleteUserDialogOpen(u)} disabled={u.id === user.id}>
+                                        <Button size="small" color="error" onClick={() => handleDeleteUserDialogOpen(u)} disabled={u.id === currentUser.id}>
                                             Delete
                                         </Button>
                                     </TableCell>

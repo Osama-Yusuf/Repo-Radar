@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react'; // Added useCont
 import axios from 'axios';
 import { Container, Typography, CircularProgress, Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material'; // Added FormControl, InputLabel, Select, MenuItem
 import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard';
-import { AuthContext } from '../contexts/AuthContext'; // Import AuthContext for token
+import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
 // Corrected API_BASE_URL definition using Vite environment variables
 const PORT = import.meta.env.VITE_PORT || '3001';
