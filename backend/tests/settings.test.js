@@ -1,23 +1,23 @@
 // backend/tests/settings.test.js
 const request = require('supertest');
-const express =require('express');
-const { db: mockDb } = require('../src/config/drizzle-client'); 
-const { appSettings: appSettingsTableSchema } = require('../src/schema/schema');
+const express = require('express');
+const { db: mockDb } = require('../src/config/drizzle-client');
+const { app_settings: app_settingsTableSchema } = require('../src/schema/schema');
 
 // Mock the middleware
 const authMiddleware = require('../src/middleware/authMiddleware');
 jest.mock('../src/middleware/authMiddleware', () => ({
     verifyToken: jest.fn((req, res, next) => {
-        next(); 
+        next();
     }),
     isAdmin: jest.fn((req, res, next) => {
         if (req.user && req.user.role === 'admin') {
             next();
         } else {
             if (!req.user) {
-                 res.status(401).json({ error: 'Access denied. No token provided' });
+                res.status(401).json({ error: 'Access denied. No token provided' });
             } else {
-                 res.status(403).json({ error: 'Forbidden' });
+                res.status(403).json({ error: 'Forbidden' });
             }
         }
     }),
@@ -27,7 +27,7 @@ const app = express();
 app.use(express.json());
 
 const settingsRoutes = require('../src/routes/settingsRoutes');
-app.use('/api/settings', settingsRoutes); 
+app.use('/api/settings', settingsRoutes);
 
 const adminUserId = 'admin-settings-id-123';
 const regularUserId = 'user-settings-id-456';
@@ -47,8 +47,8 @@ const mockDefaultSettings = {
 
 describe('Settings API /api/settings', () => {
     beforeEach(() => {
-        jest.clearAllMocks(); 
-        
+        jest.clearAllMocks();
+
         // General Drizzle method mocks for chainability
         mockDb.select.mockReturnThis();
         mockDb.from.mockReturnThis();
@@ -56,8 +56,8 @@ describe('Settings API /api/settings', () => {
         mockDb.update.mockReturnThis();
         mockDb.set.mockReturnThis();
         // Terminal methods default to empty
-        mockDb.returning.mockResolvedValue([]); 
-        mockDb.execute.mockResolvedValue([]);  
+        mockDb.returning.mockResolvedValue([]);
+        mockDb.execute.mockResolvedValue([]);
     });
 
     describe('GET /api/settings', () => {
@@ -66,7 +66,7 @@ describe('Settings API /api/settings', () => {
                 req.user = mockAdminUser;
                 next();
             });
-            // Specific mock for: db.select().from(appSettingsTable).where(eq(appSettings.id, 1)).execute()
+            // Specific mock for: db.select().from(app_settingsTable).where(eq(app_settings.id, 1)).execute()
             mockDb.select.mockReturnValueOnce({
                 from: jest.fn().mockReturnValueOnce({
                     where: jest.fn().mockReturnValueOnce({
@@ -79,13 +79,13 @@ describe('Settings API /api/settings', () => {
             expect(response.statusCode).toBe(200);
             expect(response.body).toEqual(mockDefaultSettings);
         });
-        
+
         it('should return 404 if settings not found', async () => {
             authMiddleware.verifyToken.mockImplementation((req, res, next) => {
                 req.user = mockAdminUser;
                 next();
             });
-             mockDb.select.mockReturnValueOnce({
+            mockDb.select.mockReturnValueOnce({
                 from: jest.fn().mockReturnValueOnce({
                     where: jest.fn().mockReturnValueOnce({
                         execute: jest.fn().mockResolvedValueOnce([]) // No settings found
@@ -99,21 +99,21 @@ describe('Settings API /api/settings', () => {
 
         it('should forbid non-admin user from getting settings', async () => {
             authMiddleware.verifyToken.mockImplementation((req, res, next) => {
-                req.user = mockRegularUser; 
+                req.user = mockRegularUser;
                 next();
             });
-            
+
             const response = await request(app).get('/api/settings');
             expect(response.statusCode).toBe(403);
         });
 
         it('should return 401 for unauthenticated user', async () => {
             authMiddleware.verifyToken.mockImplementation((req, res, next) => {
-                next(); 
+                next();
             });
-            
+
             const response = await request(app).get('/api/settings');
-            expect(response.statusCode).toBe(401); 
+            expect(response.statusCode).toBe(401);
         });
     });
 
@@ -130,7 +130,7 @@ describe('Settings API /api/settings', () => {
                 req.user = mockAdminUser;
                 next();
             });
-            // Specific mock for: db.update(appSettingsTable).set(...).where(...).returning()
+            // Specific mock for: db.update(app_settingsTable).set(...).where(...).returning()
             mockDb.update.mockReturnValueOnce({
                 set: jest.fn().mockReturnValueOnce({
                     where: jest.fn().mockReturnValueOnce({
@@ -143,9 +143,9 @@ describe('Settings API /api/settings', () => {
             const response = await request(app).put('/api/settings').send(newSettingsPayload);
             expect(response.statusCode).toBe(200);
             expect(response.body.settings).toEqual(updatedSettingsFromDb);
-            expect(mockDb.update).toHaveBeenCalledWith(appSettingsTableSchema);
+            expect(mockDb.update).toHaveBeenCalledWith(app_settingsTableSchema);
         });
-        
+
         it('should return 404 if settings not found to update', async () => {
             authMiddleware.verifyToken.mockImplementation((req, res, next) => {
                 req.user = mockAdminUser;
@@ -176,7 +176,7 @@ describe('Settings API /api/settings', () => {
 
         it('should return 401 for unauthenticated user', async () => {
             authMiddleware.verifyToken.mockImplementation((req, res, next) => {
-                next(); 
+                next();
             });
             const response = await request(app).put('/api/settings').send(newSettingsPayload);
             expect(response.statusCode).toBe(401);

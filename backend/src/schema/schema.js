@@ -77,7 +77,7 @@ const users = pgTable('users', {
 });
 
 // App Settings table
-const appSettings = pgTable('app_settings', {
+const app_settings = pgTable('app_settings', {
     id: serial('id').primaryKey(),
     github_api_url: text('github_api_url'),
     github_token: text('github_token'),
@@ -144,5 +144,5 @@ module.exports = {
     users,
     tracked_images, // Updated export
     image_vulnerabilities, // Updated export
-    appSettings // Export app_settings table
+    app_settings // Export app_settings table
 };

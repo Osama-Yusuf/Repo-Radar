@@ -1,6 +1,6 @@
 const { KubeConfig, CoreV1Api } = require('@kubernetes/client-node');
 const { db } = require('./drizzle-client'); // Import db
-const { appSettings } = require('../schema/schema'); // Import appSettings
+const { app_settings } = require('../schema/schema'); // Import app_settings
 const { eq } = require('drizzle-orm'); // Import eq
 
 /**
@@ -48,9 +48,9 @@ function getK8sClient() {
 async function getTargetNamespace() {
   // Try to get namespaces from DB first
   try {
-    const settingsResult = await db.select({ kubernetes_namespaces: appSettings.kubernetes_namespaces })
-                                   .from(appSettings)
-                                   .where(eq(appSettings.id, 1));
+    const settingsResult = await db.select({ kubernetes_namespaces: app_settings.kubernetes_namespaces })
+      .from(app_settings)
+      .where(eq(app_settings.id, 1));
 
     if (settingsResult.length > 0 && settingsResult[0].kubernetes_namespaces && settingsResult[0].kubernetes_namespaces.length > 0) {
       // For now, if multiple namespaces are configured, we'll log a warning and use the first one.

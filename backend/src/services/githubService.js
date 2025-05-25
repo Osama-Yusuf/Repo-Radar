@@ -2,7 +2,7 @@ const { Octokit } = require('@octokit/rest');
 const axios = require('axios');
 const https = require('https');
 const { db } = require('../config/drizzle-client'); // Import db
-const { appSettings } = require('../schema/schema'); // Import appSettings
+const { app_settings } = require('../schema/schema'); // Import app_settings
 const { eq } = require('drizzle-orm'); // Import eq
 
 class GitHubService {
@@ -132,7 +132,7 @@ class GitHubService {
 
 // Asynchronous initialization function
 async function createGitHubService() {
-    const settingsResult = await db.select().from(appSettings).where(eq(appSettings.id, 1));
+    const settingsResult = await db.select().from(app_settings).where(eq(app_settings.id, 1));
     if (settingsResult.length === 0) {
         // console.warn('GitHub settings not found in database. GitHubService will not be functional.');
         // return null; // Or throw an error, depending on how critical this is at startup
