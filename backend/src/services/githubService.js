@@ -7,13 +7,15 @@ const { eq } = require('drizzle-orm'); // Import eq
 
 class GitHubService {
     constructor(settings) { // Accept settings as a parameter
-        if (!settings || !settings.github_api_url || !settings.github_token) {
-            throw new Error('GitHub API URL and Token are required from settings');
+        if (!settings || !settings.github_api_url) {
+            throw new Error('GitHub API URL is required from settings');
         }
 
         this.baseUrl = settings.github_api_url;
-        this.octokit = new Octokit({
-            auth: settings.github_token,
+        this.hasToken = !!settings.github_token;
+
+        // Create Octokit instance with or without token
+        const octokitOptions = {
             userAgent: 'repo-radar v1.0',
             baseUrl: this.baseUrl,
             request: {
@@ -21,7 +23,14 @@ class GitHubService {
                     rejectUnauthorized: false
                 })
             }
-        });
+        };
+
+        // Only add auth if token is provided
+        if (settings.github_token) {
+            octokitOptions.auth = settings.github_token;
+        }
+
+        this.octokit = new Octokit(octokitOptions);
 
         // Create a custom Axios instance for webhooks
         this.axiosInstance = axios.create({
@@ -134,18 +143,15 @@ class GitHubService {
 async function createGitHubService() {
     const settingsResult = await db.select().from(app_settings).where(eq(app_settings.id, 1));
     if (settingsResult.length === 0) {
-        // console.warn('GitHub settings not found in database. GitHubService will not be functional.');
-        // return null; // Or throw an error, depending on how critical this is at startup
         throw new Error('GitHub settings not found in database. Cannot initialize GitHubService.');
     }
     const { github_api_url, github_token } = settingsResult[0];
 
-    if (!github_api_url || !github_token) {
-        // console.warn('GitHub API URL or Token is missing in settings. GitHubService will not be functional.');
-        // return null;
-        throw new Error('GitHub API URL or Token is missing in settings. Cannot initialize GitHubService.');
+    if (!github_api_url) {
+        throw new Error('GitHub API URL is missing in settings. Cannot initialize GitHubService.');
     }
 
+    // Token is now optional - will work for public repos without token
     return new GitHubService({ github_api_url, github_token });
 }
 
@@ -154,4 +160,3 @@ module.exports = createGitHubService();
 // This makes the module export a Promise. 
 // Other modules importing it will need to use .then() or await.
 // Example: const gitHubService = await require('./services/githubService');
-// Or: require('./services/githubService').then(service => { /* use service */ });
