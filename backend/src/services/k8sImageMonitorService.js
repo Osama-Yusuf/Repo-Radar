@@ -68,92 +68,105 @@ function parseImageDigest(imageID) {
 }
 
 /**
- * Fetches details of running images from containers in the target Kubernetes namespace.
- * @returns {Promise<Array<{name: string, tag: string | null, digest: string | null, podName: string, containerName: string}>>} A list of unique image objects.
+ * Fetches details of running images from containers in all configured Kubernetes namespaces.
+ * @param {string} [namespace] - Optional specific namespace to scan. If not provided, all configured namespaces will be scanned.
+ * @returns {Promise<Array<{name: string, tag: string | null, digest: string | null, podName: string, containerName: string, namespace: string}>>} A list of unique image objects.
  */
-async function getRunningImages() {
+async function getRunningImages(namespace) {
   if (!k8sClient) {
     console.error('Kubernetes client not initialized. Cannot fetch running images.');
     return [];
   }
 
-  const currentTargetNamespace = await getTargetNamespace(); // Fetch namespace
-  if (!currentTargetNamespace) {
-    console.error('Target namespace could not be determined. Cannot fetch running images.');
-    return [];
+  let namespacesToScan = [];
+
+  if (namespace) {
+    // If a specific namespace is provided, use only that one
+    namespacesToScan = [namespace];
+  } else {
+    // Otherwise, get all configured namespaces
+    try {
+      namespacesToScan = await getTargetNamespace(true); // Get all namespaces
+      console.log(`Retrieved ${namespacesToScan.length} namespaces to scan: ${namespacesToScan.join(', ')}`);
+    } catch (error) {
+      console.error('Failed to determine namespaces to scan:', error);
+      return [];
+    }
   }
 
-  console.log(`Fetching running images from namespace: "${currentTargetNamespace}"...`);
+  console.log(`Fetching running images from ${namespacesToScan.length} namespace(s): "${namespacesToScan.join(', ')}"...`);
   const uniqueImages = new Map(); // Using a Map to store unique images based on a composite key
+  const allDiscoveredImages = [];
 
-  try {
-    const res = await k8sClient.listNamespacedPod(currentTargetNamespace);
-    const pods = res.body.items;
-    console.log(`Found ${pods.length} pods in namespace "${currentTargetNamespace}".`);
+  for (const currentNamespace of namespacesToScan) {
+    try {
+      console.log(`Scanning namespace: "${currentNamespace}"...`);
+      const res = await k8sClient.listNamespacedPod(currentNamespace);
+      const pods = res.body.items;
+      console.log(`Found ${pods.length} pods in namespace "${currentNamespace}".`);
 
-    for (const pod of pods) {
-      const podName = pod.metadata.name;
+      for (const pod of pods) {
+        const podName = pod.metadata.name;
 
-      const processContainer = (container, containerStatus) => {
-        if (!container || !container.image) return;
+        const processContainer = (container, containerStatus) => {
+          if (!container || !container.image) return;
 
-        const imageNameAndTag = parseImageNameAndTag(container.image);
-        let digest = null;
-        let resolvedImageName = container.image; // Fallback
+          const imageNameAndTag = parseImageNameAndTag(container.image);
+          let digest = null;
 
-        if (containerStatus && containerStatus.imageID) {
-          digest = parseImageDigest(containerStatus.imageID);
-          resolvedImageName = containerStatus.image || resolvedImageName; // Prefer status.image if available
-          // Re-parse name and tag from resolved image name if it's different and more specific
-          if (containerStatus.image && containerStatus.image !== container.image) {
-            const resolvedImageNameAndTag = parseImageNameAndTag(containerStatus.image);
-            imageNameAndTag.name = resolvedImageNameAndTag.name;
-            imageNameAndTag.tag = resolvedImageNameAndTag.tag;
+          // Try to get the image digest from container status
+          if (containerStatus && containerStatus.imageID) {
+            digest = parseImageDigest(containerStatus.imageID);
+          }
+
+          // Create a unique key for this image (name + tag + digest)
+          const key = `${imageNameAndTag.name}:${imageNameAndTag.tag || 'latest'}${digest ? '@' + digest : ''}`;
+
+          // Only add if not already in the map (first occurrence wins)
+          if (!uniqueImages.has(key)) {
+            const imageInfo = {
+              name: imageNameAndTag.name,
+              tag: imageNameAndTag.tag || 'latest',
+              digest: digest,
+              podName: podName,
+              containerName: container.name,
+              namespace: currentNamespace // Add namespace information
+            };
+            uniqueImages.set(key, imageInfo);
+            allDiscoveredImages.push(imageInfo);
+          }
+        };
+
+        // Process init containers if present
+        if (pod.spec.initContainers && Array.isArray(pod.spec.initContainers)) {
+          for (const initContainer of pod.spec.initContainers) {
+            // Find matching status for this init container
+            const initContainerStatus = pod.status.initContainerStatuses?.find(
+              status => status.name === initContainer.name
+            );
+            processContainer(initContainer, initContainerStatus);
           }
         }
 
-        const imageKey = `${imageNameAndTag.name}:${imageNameAndTag.tag}@${digest || 'nodigest'}`;
-        if (!uniqueImages.has(imageKey)) {
-          uniqueImages.set(imageKey, {
-            name: imageNameAndTag.name,
-            tag: imageNameAndTag.tag,
-            digest: digest,
-            podName: podName,
-            containerName: container.name,
-            sourceImageString: container.image, // Original string from spec
-            resolvedImageString: resolvedImageName // Resolved image string from status
-          });
+        // Process regular containers
+        if (pod.spec.containers && Array.isArray(pod.spec.containers)) {
+          for (const container of pod.spec.containers) {
+            // Find matching status for this container
+            const containerStatus = pod.status.containerStatuses?.find(
+              status => status.name === container.name
+            );
+            processContainer(container, containerStatus);
+          }
         }
-      };
-
-      // Process standard containers
-      (pod.spec.containers || []).forEach(container => {
-        const status = (pod.status.containerStatuses || []).find(cs => cs.name === container.name);
-        processContainer(container, status);
-      });
-
-      // Process init containers
-      (pod.spec.initContainers || []).forEach(container => {
-        const status = (pod.status.initContainerStatuses || []).find(cs => cs.name === container.name);
-        processContainer(container, status);
-      });
-
-      // Process ephemeral containers (if relevant and exist)
-      (pod.spec.ephemeralContainers || []).forEach(container => {
-        // Ephemeral containers might not have statuses in the same way or might not be relevant for vulnerability scanning
-        // For now, let's assume they might appear in containerStatuses if running or completed.
-        const status = (pod.status.containerStatuses || []).find(cs => cs.name === container.name); // Check regular statuses
-        processContainer(container, status);
-      });
+      }
+    } catch (error) {
+      console.error(`Error fetching pods from namespace "${currentNamespace}":`, error);
+      // Continue with other namespaces rather than failing completely
     }
-  } catch (error) {
-    console.error(`Error fetching or processing pods from namespace "${currentTargetNamespace}":`, error.message, error.stack ? `\nStack: ${error.stack}` : '');
-    // Rethrow or handle as per application's error handling strategy
-    throw error; // Rethrowing to be caught by monitoringTick or calling function
   }
 
   const resultList = Array.from(uniqueImages.values());
-  console.log(`Found ${resultList.length} unique images running in namespace "${currentTargetNamespace}".`);
+  console.log(`Found ${resultList.length} unique images running across ${namespacesToScan.length} namespace(s).`);
   return resultList;
 }
 
@@ -161,19 +174,14 @@ async function getRunningImages() {
  * Starts a polling mechanism to periodically fetch and log running Kubernetes images.
  * @param {number} intervalMs - The interval in milliseconds for polling. Defaults to 60000ms (1 minute).
  */
-async function startMonitoring(intervalMs = 60000) { // Make startMonitoring async
+async function startMonitoring(intervalMs = 60000) {
   if (!k8sClient) {
     console.warn('Kubernetes client not initialized. Monitoring will not start.');
     return;
   }
 
-  const currentTargetNamespace = await getTargetNamespace(); // Fetch namespace at the start
-  if (!currentTargetNamespace) {
-    console.error('Target namespace could not be determined. Monitoring will not start.');
-    return;
-  }
-
-  console.log(`Starting Kubernetes image monitoring for namespace "${currentTargetNamespace}" with interval ${intervalMs}ms.`);
+  // No need to fetch a specific namespace here as getRunningImages will handle all namespaces
+  console.log(`Starting Kubernetes image monitoring for all configured namespaces with interval ${intervalMs}ms.`);
 
   const monitoringTick = async () => {
     console.log('Image monitoring tick started...');
@@ -181,38 +189,41 @@ async function startMonitoring(intervalMs = 60000) { // Make startMonitoring asy
       console.warn('Kubernetes client not available, skipping Kubernetes discovery part of monitoring tick.');
       // Allow scanPendingImages to run even if K8s client fails, as pending images might be from previous discovery
     } else {
-      const currentTickNamespace = await getTargetNamespace(); // Re-fetch in case it changed
-      if (!currentTickNamespace) {
-        console.error('Target namespace could not be determined for this tick. Skipping K8s discovery.');
-      } else {
-        try {
-          const discoveredImages = await getRunningImages(); // getRunningImages now fetches its own namespace
-          console.log(`Discovered ${discoveredImages.length} unique images in namespace "${currentTickNamespace}".`);
+      try {
+        const discoveredImages = await getRunningImages(); // This will now scan all namespaces
+        console.log(`Discovered ${discoveredImages.length} unique images across all configured namespaces.`);
 
-          for (const image of discoveredImages) {
-            await processDiscoveredImage(image); // This marks images as 'pending' if new or needing rescan
-          }
-        } catch (error) {
-          console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
+        for (const image of discoveredImages) {
+          await processDiscoveredImage(image); // This marks images as 'pending' if new or needing rescan
         }
+      } catch (error) {
+        console.error('Error during Kubernetes image discovery part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
       }
     }
 
     // Always try to scan pending images
     try {
-      await scanPendingImages(); // This scans images marked 'pending' and updates results
+      await scanPendingImages();
     } catch (error) {
       console.error('Error during pending image scanning part of monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
     }
-    console.log('Image monitoring tick finished.');
   };
 
-  // Initial call
-  monitoringTick();
+  // Run the first tick immediately
+  await monitoringTick();
 
-  setInterval(monitoringTick, intervalMs);
+  // Set up the interval
+  const intervalId = setInterval(async () => {
+    try {
+      await monitoringTick();
+    } catch (error) {
+      console.error('Unhandled error in monitoring tick:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
+    }
+  }, intervalMs);
+
+  // Return the interval ID so it can be cleared if needed
+  return intervalId;
 }
-
 
 async function scanPendingImages() {
   const logPrefix = '[ScanPendingImages]';
@@ -461,8 +472,8 @@ async function scanPendingImages() {
 }
 
 async function processDiscoveredImage(discoveredImage) {
-  const { name, tag, digest } = discoveredImage;
-  const logPrefix = `Image [${name}:${tag}${digest ? ('@' + digest.substring(0, 15)) : ''}]:`;
+  const { name, tag, digest, namespace } = discoveredImage;
+  const logPrefix = `Image [${name}:${tag}${digest ? ('@' + digest.substring(0, 15)) : ''}]${namespace ? ` in namespace "${namespace}"` : ''}:`;
 
   try {
     // Ensure logPrefix is defined at the start of the function for consistent use, even in error paths.
@@ -517,9 +528,10 @@ async function processDiscoveredImage(discoveredImage) {
         image_name: name,
         image_tag: tag,
         image_digest: digest, // Will be null if not available
+        namespace: namespace || 'default', // Store the namespace information
         scan_status: 'pending',
         last_seen_at: new Date(),
-        // last_scanned_at will be set upon scan completion
+        last_scanned_at: new Date(), // Initialize with current date
         created_at: new Date(),
         updated_at: new Date(),
       }).execute();
@@ -531,6 +543,12 @@ async function processDiscoveredImage(discoveredImage) {
         last_seen_at: new Date(),
         updated_at: new Date(),
       };
+
+      // Update namespace if it's different or not set
+      if (namespace && (!existingImageEntry.namespace || existingImageEntry.namespace !== namespace)) {
+        updates.namespace = namespace;
+        console.log(`${logPrefix} Updating namespace from '${existingImageEntry.namespace || 'not set'}' to '${namespace}'`);
+      }
 
       // Sub-Case 2a: Digest Mismatch or New Digest for an existing Name/Tag entry
       if (digest && existingImageEntry.image_digest !== digest) {
@@ -578,11 +596,22 @@ async function processDiscoveredImage(discoveredImage) {
           .execute();
       } else {
         // Only last_seen_at and updated_at would be updated
+        const basicUpdates = {
+          last_seen_at: new Date(),
+          updated_at: new Date()
+        };
+
+        if (namespace && (!existingImageEntry.namespace || existingImageEntry.namespace !== namespace)) {
+          basicUpdates.namespace = namespace;
+          console.log(`${logPrefix} Updating namespace from '${existingImageEntry.namespace || 'not set'}' to '${namespace}'`);
+        }
+
         await db.update(tracked_images)
-          .set({ last_seen_at: new Date(), updated_at: new Date() })
+          .set(basicUpdates)
           .where(eq(tracked_images.id, existingImageEntry.id))
           .execute();
-        console.log(`${logPrefix} Image known and up-to-date. Updated last_seen_at.`);
+
+        console.log(`${logPrefix} Image known and up-to-date. Updated last_seen_at${basicUpdates.namespace ? ' and namespace' : ''}.`);
       }
 
       if (needsRescan) {

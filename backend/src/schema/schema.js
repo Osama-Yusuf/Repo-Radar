@@ -98,6 +98,8 @@ const tracked_images = pgTable('tracked_images', {
     image_name: text('image_name').notNull(), // No longer unique on its own
     image_tag: text('image_tag').notNull(),
     image_digest: text('image_digest'), // Nullable
+    namespace: text('namespace'), // Add namespace column to track which namespace the image was found in
+    last_seen_at: timestamp('last_seen_at').defaultNow().notNull(), // Track when the image was last seen
     last_scanned_at: timestamp('last_scanned_at').defaultNow().notNull(),
     scan_status: text('scan_status').notNull(), // e.g., 'pending', 'scanning', 'success', 'failed'
     raw_trivy_output: jsonb('raw_trivy_output'), // Added back to match database structure

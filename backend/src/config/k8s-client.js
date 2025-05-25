@@ -38,14 +38,14 @@ function getK8sClient() {
 }
 
 /**
- * @description Determines the target Kubernetes namespace.
- * Reads the K8S_TARGET_NAMESPACE environment variable.
- * If the variable is set and not empty, its value is returned.
- * Otherwise, 'default' is returned.
- * Logs the determined namespace.
- * @returns {string} The target Kubernetes namespace.
+ * @description Determines the target Kubernetes namespace(s).
+ * First tries to get namespaces from the database settings.
+ * If that fails, falls back to the K8S_TARGET_NAMESPACE environment variable.
+ * If that's not set, falls back to the 'default' namespace.
+ * @param {boolean} [returnAll=false] - If true, returns all configured namespaces as an array
+ * @returns {Promise<string|string[]>} The target Kubernetes namespace(s)
  */
-async function getTargetNamespace() {
+async function getTargetNamespace(returnAll = false) {
   // Try to get namespaces from DB first
   try {
     const settingsResult = await db.select({ kubernetes_namespaces: app_settings.kubernetes_namespaces })
@@ -53,8 +53,13 @@ async function getTargetNamespace() {
       .where(eq(app_settings.id, 1));
 
     if (settingsResult.length > 0 && settingsResult[0].kubernetes_namespaces && settingsResult[0].kubernetes_namespaces.length > 0) {
-      // For now, if multiple namespaces are configured, we'll log a warning and use the first one.
-      // The ability to select a namespace or use all of them will be handled in specific API calls or UI.
+      // If returnAll is true, return all configured namespaces
+      if (returnAll) {
+        console.log(`Using all target namespaces from DB settings: ${settingsResult[0].kubernetes_namespaces.join(', ')}`);
+        return settingsResult[0].kubernetes_namespaces;
+      }
+
+      // For backward compatibility, return just the first namespace
       if (settingsResult[0].kubernetes_namespaces.length > 1) {
         console.warn(`Multiple Kubernetes namespaces configured in settings: ${settingsResult[0].kubernetes_namespaces.join(', ')}. Using the first one: ${settingsResult[0].kubernetes_namespaces[0]}`);
       }
@@ -69,13 +74,20 @@ async function getTargetNamespace() {
   // Fallback to environment variable
   const namespaceFromEnv = process.env.K8S_TARGET_NAMESPACE;
   if (namespaceFromEnv && namespaceFromEnv.trim() !== '') {
+    // If returnAll is true and env var contains comma-separated values, split them
+    if (returnAll && namespaceFromEnv.includes(',')) {
+      const namespaces = namespaceFromEnv.split(',').map(ns => ns.trim()).filter(ns => ns);
+      console.log(`Using all target namespaces from K8S_TARGET_NAMESPACE: ${namespaces.join(', ')}`);
+      return namespaces;
+    }
+
     console.log(`Using target namespace from K8S_TARGET_NAMESPACE: ${namespaceFromEnv}`);
-    return namespaceFromEnv.trim();
+    return returnAll ? [namespaceFromEnv.trim()] : namespaceFromEnv.trim();
   }
 
   // Fallback to 'default' namespace
   console.log('K8S_TARGET_NAMESPACE not set or empty, and no valid namespace in DB settings. Using default namespace: "default"');
-  return 'default';
+  return returnAll ? ['default'] : 'default';
 }
 
 /**

@@ -5,7 +5,7 @@ const { sql } = require('drizzle-orm');
 async function setupDatabase() {
   try {
     console.log('Setting up database using Drizzle...');
-    
+
     // Create tables in the correct order to handle foreign key relationships
     const createTables = sql`
       -- Create projects table
@@ -103,6 +103,8 @@ async function setupDatabase() {
         image_name TEXT NOT NULL,
         image_tag TEXT NOT NULL,
         image_digest TEXT,
+        namespace TEXT,
+        last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         last_scanned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         scan_status TEXT NOT NULL,
         raw_trivy_output JSONB,
