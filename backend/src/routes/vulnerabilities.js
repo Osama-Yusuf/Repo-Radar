@@ -133,9 +133,9 @@ router.get('/scan/:imageName', async (req, res) => {
             vulnerabilities: vulnerabilities.map(v => ({
                 id: v.id,
                 cveId: v.vulnerability_cve_id,
-                packageName: v.pkg_name,
-                installedVersion: v.installed_version,
-                fixedVersion: v.fixed_version,
+                packageName: v.pkgName,
+                installedVersion: v.installedVersion,
+                fixedVersion: v.fixedVersion,
                 severity: v.severity,
                 title: v.title,
                 description: v.description,
