@@ -3,7 +3,7 @@ import {
   Container, Typography, Box, CircularProgress, Button, IconButton,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,
   Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, Tooltip, Alert, Link as MuiLink, Card, CardContent, Grid
+  Chip, Tooltip, Alert, Link as MuiLink, Card, CardContent, Grid, FormControl, OutlinedInput, InputAdornment, InputLabel, Select, MenuItem
 } from '@mui/material';
 import {
   AddCircleOutline as AddCircleOutlineIcon,
@@ -11,7 +11,8 @@ import {
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
   CheckCircleOutline as CheckCircleOutlineIcon, // For UP status
-  ErrorOutline as ErrorOutlineIcon // For DOWN status
+  ErrorOutline as ErrorOutlineIcon, // For DOWN status
+  Search as SearchIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import AuthContext from '../contexts/AuthContext';
@@ -50,6 +51,11 @@ const AppStatusPage = () => {
     endpointId: null,
     endpointName: '',
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   const fetchEndpoints = async () => {
     setLoadingEndpoints(true);
@@ -180,6 +186,36 @@ const AppStatusPage = () => {
     }
   };
 
+  const filteredEndpoints = endpoints.filter(endpoint => {
+    if (filterType !== 'all' && endpoint.type !== filterType) return false;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'up' && !(endpoint.latest_status?.status_ok)) return false;
+      if (filterStatus === 'down' && !(!endpoint.latest_status?.status_ok)) return false;
+      if (filterStatus === 'unknown' && endpoint.latest_status) return false;
+    }
+    if (searchTerm && !endpoint.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+
+  const sortedEndpoints = filteredEndpoints.sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'type') return a.type.localeCompare(b.type);
+    if (sortBy === 'status') {
+      if (a.latest_status?.status_ok && !b.latest_status?.status_ok) return -1;
+      if (!a.latest_status?.status_ok && b.latest_status?.status_ok) return 1;
+      return 0;
+    }
+    if (sortBy === 'lastChecked') {
+      if (a.last_checked_at && !b.last_checked_at) return -1;
+      if (!a.last_checked_at && b.last_checked_at) return 1;
+      return a.last_checked_at.localeCompare(b.last_checked_at);
+    }
+    if (sortBy === 'interval') return a.check_interval_seconds - b.check_interval_seconds;
+    return 0;
+  });
+
+  if (sortDirection === 'desc') sortedEndpoints.reverse();
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -199,6 +235,241 @@ const AppStatusPage = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
+      {/* Stats Container */}
+      <Card sx={{
+        bgcolor: 'rgba(26, 32, 53, 0.7)',
+        borderRadius: 2,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        mb: 3
+      }}>
+        <CardContent>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>
+                  {endpoints.length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#90CAF9' }}>
+                  Total Endpoints
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                  {endpoints.filter(e => e.latest_status?.status_ok).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#A5D6A7' }}>
+                  UP
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: '#F44336', fontWeight: 'bold' }}>
+                  {endpoints.filter(e => e.latest_status && !e.latest_status.status_ok).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#EF9A9A' }}>
+                  DOWN
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: '#FFC107', fontWeight: 'bold' }}>
+                  {endpoints.filter(e => !e.latest_status).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#FFE082' }}>
+                  Unknown
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: '#CE93D8', fontWeight: 'bold' }}>
+                  {endpoints.filter(e => e.type === 'custom').length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#CE93D8' }}>
+                  Custom
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Box sx={{ textAlign: 'center', p: 1 }}>
+                <Typography variant="h4" sx={{ color: '#90CAF9', fontWeight: 'bold' }}>
+                  {endpoints.filter(e => e.type === 'discovered').length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#90CAF9' }}>
+                  Discovered
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Search, Filter and Sort Controls */}
+      <Box sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 2,
+        mb: 3,
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flex: 1 }}>
+          {/* Search */}
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 200, flex: 1 }}>
+            <OutlinedInput
+              placeholder="Search endpoints..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+                </InputAdornment>
+              }
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#90CAF9',
+                },
+              }}
+            />
+          </FormControl>
+
+          {/* Type Filter */}
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
+            <InputLabel id="filter-type-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Type</InputLabel>
+            <Select
+              labelId="filter-type-label"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              label="Type"
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#90CAF9',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                }
+              }}
+            >
+              <MenuItem value="all">All Types</MenuItem>
+              <MenuItem value="custom">Custom</MenuItem>
+              <MenuItem value="discovered">Discovered</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Status Filter */}
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
+            <InputLabel id="filter-status-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Status</InputLabel>
+            <Select
+              labelId="filter-status-label"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              label="Status"
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#90CAF9',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                }
+              }}
+            >
+              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="up">UP</MenuItem>
+              <MenuItem value="down">DOWN</MenuItem>
+              <MenuItem value="unknown">Unknown</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Sort Controls */}
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="sort-by-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Sort By</InputLabel>
+            <Select
+              labelId="sort-by-label"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              label="Sort By"
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#90CAF9',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                }
+              }}
+            >
+              <MenuItem value="name">Name</MenuItem>
+              <MenuItem value="type">Type</MenuItem>
+              <MenuItem value="status">Status</MenuItem>
+              <MenuItem value="lastChecked">Last Checked</MenuItem>
+              <MenuItem value="interval">Check Interval</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
+            <InputLabel id="sort-direction-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Direction</InputLabel>
+            <Select
+              labelId="sort-direction-label"
+              value={sortDirection}
+              onChange={(e) => setSortDirection(e.target.value)}
+              label="Direction"
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#90CAF9',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                }
+              }}
+            >
+              <MenuItem value="asc">Ascending</MenuItem>
+              <MenuItem value="desc">Descending</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      </Box>
+
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Tooltip title="Refresh List">
           <IconButton onClick={fetchEndpoints} disabled={loadingEndpoints} sx={{ color: 'white' }}>
@@ -211,7 +482,7 @@ const AppStatusPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
           <CircularProgress />
         </Box>
-      ) : endpoints.length === 0 ? (
+      ) : sortedEndpoints.length === 0 ? (
         <Card sx={{
           bgcolor: 'rgba(26, 32, 53, 0.7)',
           borderRadius: 2,
@@ -290,7 +561,7 @@ const AppStatusPage = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {endpoints.map((endpoint) => (
+                {sortedEndpoints.map((endpoint) => (
                   <React.Fragment key={endpoint.id}>
                     <TableRow>
                       <TableCell sx={{ color: 'white' }}>{endpoint.name}</TableCell>
