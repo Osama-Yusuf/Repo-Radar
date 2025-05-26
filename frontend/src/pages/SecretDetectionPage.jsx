@@ -4,10 +4,6 @@ import {
   Typography,
   Box,
   CircularProgress,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Paper,
   Table,
   TableBody,
@@ -16,12 +12,17 @@ import {
   TableHead,
   TableRow,
   Link as MuiLink,
-  Alert
+  Alert,
+  Grid, // Added Grid
+  Card, // Added Card
+  CardContent, // Added CardContent
+  CardActions, // Added CardActions
+  Button // Added Button
 } from '@mui/material';
 import axios from 'axios';
-// import AuthContext from '../contexts/AuthContext'; // Not explicitly needed if auth is cookie-based
+// import AuthContext from '../contexts/AuthContext'; 
 
-// Reconstruct API_BASE_URL and axiosInstance as it's not exported from App.jsx
+// Reconstruct API_BASE_URL and axiosInstance
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
@@ -37,6 +38,8 @@ const SecretDetectionPage = () => {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingFindings, setLoadingFindings] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedProjectName, setSelectedProjectName] = useState('');
+
 
   // Fetch projects on component mount
   useEffect(() => {
@@ -45,11 +48,11 @@ const SecretDetectionPage = () => {
       setError(null);
       try {
         const response = await axiosInstance.get('/projects');
-        setProjects(response.data || []); // Ensure projects is always an array
+        setProjects(response.data || []); 
       } catch (err) {
         console.error('Error fetching projects:', err);
         setError('Failed to load projects. Please try again later.');
-        setProjects([]); // Ensure projects is an array on error
+        setProjects([]); 
       } finally {
         setLoadingProjects(false);
       }
@@ -61,31 +64,33 @@ const SecretDetectionPage = () => {
   useEffect(() => {
     if (!selectedProjectId) {
       setFindings([]);
-      setError(null); // Clear error when no project is selected
+      // Keep project-level error if any, or clear general error if just deselecting
+      // setError(null); 
       return;
     }
 
-    const fetchFindings = async () => {
+    const fetchFindingsForProject = async () => {
       setLoadingFindings(true);
-      setError(null); // Clear previous errors
-      setFindings([]); // Clear previous findings
+      setError(null); 
+      setFindings([]); 
       try {
         const response = await axiosInstance.get(`/projects/${selectedProjectId}/secret-findings`);
-        setFindings(response.data || []); // Ensure findings is always an array
+        setFindings(response.data || []); 
       } catch (err) {
         console.error(`Error fetching findings for project ${selectedProjectId}:`, err);
-        setError(`Failed to load findings for project ${selectedProjectId}.`);
-        setFindings([]); // Ensure findings is an array on error
+        setError(`Failed to load findings for project ${selectedProjectName}.`);
+        setFindings([]); 
       } finally {
         setLoadingFindings(false);
       }
     };
 
-    fetchFindings();
-  }, [selectedProjectId]);
+    fetchFindingsForProject();
+  }, [selectedProjectId, selectedProjectName]); // Added selectedProjectName to dependency for error message
 
-  const handleProjectChange = (event) => {
-    setSelectedProjectId(event.target.value);
+  const handleSelectProject = (projectId, projectName) => {
+    setSelectedProjectId(projectId);
+    setSelectedProjectName(projectName);
   };
 
   return (
@@ -94,32 +99,56 @@ const SecretDetectionPage = () => {
         Secret Detection Findings
       </Typography>
 
-      {loadingProjects ? (
+      {loadingProjects && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
           <CircularProgress />
           <Typography sx={{ ml: 2 }}>Loading projects...</Typography>
         </Box>
-      ) : (
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel id="project-select-label">Select Project</InputLabel>
-          <Select
-            labelId="project-select-label"
-            id="project-select"
-            value={selectedProjectId}
-            label="Select Project"
-            onChange={handleProjectChange}
-            disabled={projects.length === 0}
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {projects.map((project) => (
-              <MenuItem key={project.id} value={project.id}>
-                {project.name} (ID: {project.id})
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+      )}
+
+      {!loadingProjects && projects.length === 0 && !error && (
+         <Typography variant="body1" sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}>
+          No projects found. Add projects to monitor them for secrets.
+        </Typography>
+      )}
+      
+      {!loadingProjects && projects.length > 0 && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {projects.map((project) => (
+            <Grid item xs={12} sm={6} md={4} key={project.id}>
+              <Card sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  bgcolor: selectedProjectId === project.id ? 'action.selected' : 'background.paper', 
+                  border: selectedProjectId === project.id ? '1px solid #2196f3' : '1px solid transparent',
+                  boxShadow: selectedProjectId === project.id ? '0 0 12px #2196f3' : 3,
+                }}>
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography gutterBottom variant="h6" component="div">
+                    {project.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ID: {project.id}
+                  </Typography>
+                  <MuiLink href={project.repo_url} target="_blank" rel="noopener noreferrer" variant="body2">
+                    {project.repo_url}
+                  </MuiLink>
+                </CardContent>
+                <CardActions>
+                  <Button 
+                    size="small" 
+                    onClick={() => handleSelectProject(project.id, project.name)}
+                    variant={selectedProjectId === project.id ? "contained" : "outlined"}
+                  >
+                    {selectedProjectId === project.id && loadingFindings ? <CircularProgress size={20} sx={{mr:1}}/> : null}
+                    {selectedProjectId === project.id ? 'Selected' : 'View Findings'}
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       )}
 
       {error && (
@@ -128,28 +157,23 @@ const SecretDetectionPage = () => {
         </Alert>
       )}
 
-      {!selectedProjectId && !loadingProjects && (
-        <Typography variant="body1" sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}>
-          Please select a project to view its secret findings.
-        </Typography>
-      )}
-
       {selectedProjectId && loadingFindings && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
           <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Loading findings...</Typography>
+          <Typography sx={{ ml: 2 }}>Loading findings for {selectedProjectName}...</Typography>
         </Box>
       )}
-
+      
       {selectedProjectId && !loadingFindings && !error && findings.length === 0 && (
-        <Typography variant="body1" sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}>
-          No secret findings detected for this project.
+         <Typography variant="body1" sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}>
+          No secret findings detected for project: {selectedProjectName}.
         </Typography>
       )}
 
       {selectedProjectId && !loadingFindings && !error && findings.length > 0 && (
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: '70vh' }}> {/* Adjust maxHeight as needed */}
+        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 2 }}>
+          <Typography variant="h5" sx={{ p: 2 }}>Findings for: {selectedProjectName}</Typography>
+          <TableContainer sx={{ maxHeight: '70vh' }}>
             <Table stickyHeader aria-label="secret findings table">
               <TableHead>
                 <TableRow>

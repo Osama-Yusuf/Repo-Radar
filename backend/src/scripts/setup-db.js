@@ -146,6 +146,36 @@ async function setupDatabase() {
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
       );
 
+      -- Create monitored_endpoints table
+      CREATE TABLE IF NOT EXISTS monitored_endpoints (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        check_interval_seconds INTEGER NOT NULL DEFAULT 60,
+        type TEXT NOT NULL DEFAULT 'custom',
+        source_namespace TEXT,
+        source_resource_name TEXT,
+        source_resource_kind TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+        last_checked_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Create endpoint_status_history table
+      CREATE TABLE IF NOT EXISTS endpoint_status_history (
+        id SERIAL PRIMARY KEY,
+        endpoint_id INTEGER NOT NULL REFERENCES monitored_endpoints(id) ON DELETE CASCADE,
+        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status_code INTEGER,
+        status_ok BOOLEAN NOT NULL,
+        response_time_ms INTEGER,
+        error_message TEXT
+      );
+
+      -- Create index for endpoint_status_history table
+      CREATE INDEX IF NOT EXISTS endpoint_history_idx ON endpoint_status_history (endpoint_id, timestamp);
+
       -- Create indexes for image_vulnerabilities table
       CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_tracked_image_id ON image_vulnerabilities(tracked_image_id);
       CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_vulnerability_cve_id ON image_vulnerabilities(vulnerability_cve_id);

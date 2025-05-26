@@ -8,6 +8,7 @@ import {
   AutoMode as AutoModeIcon,
   Security as SecurityIcon,
   Policy as PolicyIcon, // Added PolicyIcon for Secret Detection
+  Timeline as TimelineIcon, // Added TimelineIcon for App Status
   Settings as SettingsIcon // Import SettingsIcon
 } from '@mui/icons-material';
 import AuthContext from '../../contexts/AuthContext';
@@ -18,6 +19,7 @@ const baseNavItems = [
   { path: '/pipeline-status', label: 'Pipeline Status', icon: <AutoModeIcon /> },
   { path: '/vulnerabilities', label: 'Vulnerabilities', icon: <SecurityIcon /> },
   { path: '/secret-detection', label: 'Secret Detection', icon: <PolicyIcon /> }, // Added Secret Detection link
+  { path: '/app-status', label: 'App Status', icon: <TimelineIcon /> }, // Added App Status link
 ];
 
 const SideNav = () => {

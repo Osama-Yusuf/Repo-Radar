@@ -18,7 +18,9 @@ const settingsRoutes = require('./src/routes/settingsRoutes'); // Import setting
 const k8sRoutes = require('./src/routes/k8s');
 const tektonRoutes = require('./src/routes/tekton');
 const vulnerabilityRoutes = require('./src/routes/vulnerabilities');
+const appStatusRoutes = require('./src/routes/appStatusRoutes'); // Import app status routes
 const { startMonitoring: startK8sImageMonitoring } = require('./src/services/k8sImageMonitorService');
+const { startSchedulers: startAppStatusSchedulers } = require('./src/services/appStatusSchedulerService'); // Import app status scheduler
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -59,6 +61,7 @@ async function initializeApp() {
         app.use('/api/k8s', k8sRoutes);
         app.use('/api/tekton', tektonRoutes);
         app.use('/api/vulnerabilities', vulnerabilityRoutes); // Mount vulnerability routes
+        app.use('/api/status', appStatusRoutes); // Mount app status routes
 
         // Swagger documentation
         app.use('/', swaggerUi.serve);
@@ -74,6 +77,14 @@ async function initializeApp() {
             console.log('Kubernetes image monitoring service started.');
         } else {
             console.warn('Kubernetes image monitoring service could not be started (startMonitoring function not found).');
+        }
+        
+        // Start Application Status Schedulers
+        if (startAppStatusSchedulers) {
+            startAppStatusSchedulers();
+            console.log('Application status monitoring schedulers started.');
+        } else {
+            console.warn('Application status monitoring schedulers could not be started (startSchedulers function not found).');
         }
 
         // Start server

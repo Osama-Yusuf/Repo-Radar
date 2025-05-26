@@ -1,4 +1,4 @@
-const { pgTable, serial, text, integer, timestamp, varchar, primaryKey, unique, jsonb, index: pgIndex } = require('drizzle-orm/pg-core');
+const { pgTable, serial, text, integer, timestamp, varchar, primaryKey, unique, jsonb, index: pgIndex, boolean } = require('drizzle-orm/pg-core');
 
 // Project table
 const projects = pgTable('projects', {
@@ -165,4 +165,51 @@ module.exports = {
     image_vulnerabilities, // Updated export
     app_settings, // Export app_settings table
     gitleaks_findings // Export gitleaks_findings table
+};
+
+// Monitored Endpoints table
+const monitored_endpoints = pgTable('monitored_endpoints', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    url: text('url').notNull().unique(),
+    check_interval_seconds: integer('check_interval_seconds').notNull().default(60),
+    type: text('type').notNull().default('custom'), // 'auto-discovered', 'custom'
+    source_namespace: text('source_namespace'),
+    source_resource_name: text('source_resource_name'),
+    source_resource_kind: text('source_resource_kind'), // e.g., 'Ingress', 'Route'
+    is_deleted: boolean('is_deleted').default(false).notNull(),
+    last_checked_at: timestamp('last_checked_at'), // Nullable
+    created_at: timestamp('created_at').defaultNow().notNull(),
+    updated_at: timestamp('updated_at').defaultNow().notNull()
+});
+
+// Endpoint Status History table
+const endpoint_status_history = pgTable('endpoint_status_history', {
+    id: serial('id').primaryKey(),
+    endpoint_id: integer('endpoint_id').notNull().references(() => monitored_endpoints.id, { onDelete: 'cascade' }),
+    timestamp: timestamp('timestamp').defaultNow().notNull(),
+    status_code: integer('status_code'), // Nullable if network error
+    status_ok: boolean('status_ok').notNull(),
+    response_time_ms: integer('response_time_ms'), // Nullable
+    error_message: text('error_message') // Nullable
+}, (table) => {
+    return {
+        endpointHistoryIdx: pgIndex('endpoint_history_idx').on(table.endpoint_id, table.timestamp),
+    };
+});
+
+module.exports = {
+    projects,
+    branches,
+    checkLogs,
+    actions,
+    secrets,
+    webhookParameters,
+    users,
+    tracked_images,
+    image_vulnerabilities,
+    app_settings,
+    gitleaks_findings,
+    monitored_endpoints,     // Export monitored_endpoints table
+    endpoint_status_history  // Export endpoint_status_history table
 };

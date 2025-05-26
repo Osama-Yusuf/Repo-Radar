@@ -58,6 +58,35 @@ function setupProjectRoutes(projectController) {
 
     /**
      * @swagger
+     * /projects/{projectId}/secret-findings:
+     *   get:
+     *     summary: Get GitLeaks secret findings for a project
+     *     tags: [Projects, Secrets] 
+     *     parameters:
+     *       - in: path
+     *         name: projectId
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The ID of the project
+     *     responses:
+     *       200:
+     *         description: A list of secret findings
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 $ref: '#/components/schemas/GitleaksFinding' 
+     *       404:
+     *         description: Project not found
+     *       500:
+     *         description: Server error
+     */
+    router.get('/:projectId/secret-findings', projectController.getProjectSecretFindings.bind(projectController));
+
+    /**
+     * @swagger
      * /projects/{projectId}/trigger:
      *   post:
      *     summary: Trigger project actions for a specific branch
