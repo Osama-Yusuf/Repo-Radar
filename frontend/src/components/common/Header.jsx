@@ -8,7 +8,7 @@ import axios from 'axios';
 const PORT = import.meta.env.VITE_PORT || '3001';
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || `http://localhost:${PORT}/api`;
 
-const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
+const Header = ({ onRefresh, onAddProject, isRefreshing, showAddProjectButton = true }) => {
   const { handleSearch } = useSearch();
   const { currentUser, logout } = useAuth();
   const [importInput, setImportInput] = useState(null);
@@ -143,22 +143,25 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
             </>
           )}
 
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={onAddProject}
-            sx={{
-              background: 'linear-gradient(45deg, #2196f3 30%, #21CBF3 90%)',
-              boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
-              color: 'white',
-              fontWeight: 600,
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1976d2 30%, #00a0c2 90%)'
-              }
-            }}
-          >
-            Add Project
-          </Button>
+          {/* Only show Add Project button when showAddProjectButton is true */}
+          {showAddProjectButton && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={onAddProject}
+              sx={{
+                background: 'linear-gradient(45deg, #2196f3 30%, #21CBF3 90%)',
+                boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                color: 'white',
+                fontWeight: 600,
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1976d2 30%, #00a0c2 90%)'
+                }
+              }}
+            >
+              Add Project
+            </Button>
+          )}
 
           {currentUser && (
             <>

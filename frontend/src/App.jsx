@@ -663,6 +663,7 @@ function App() {
                         onRefresh={() => fetchProjects(true)}
                         onAddProject={() => handleOpenDialog()}
                         isRefreshing={refreshing}
+                        showAddProjectButton={false}
                       />
                       <PodStatus />
                     </Box>
@@ -679,6 +680,7 @@ function App() {
                         onRefresh={() => fetchProjects(true)}
                         onAddProject={() => handleOpenDialog()}
                         isRefreshing={refreshing}
+                        showAddProjectButton={false}
                       />
                       <PipelineStatus />
                     </Box>
