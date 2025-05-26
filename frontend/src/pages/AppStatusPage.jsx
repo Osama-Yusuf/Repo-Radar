@@ -14,7 +14,7 @@ import {
   ErrorOutline as ErrorOutlineIcon // For DOWN status
 } from '@mui/icons-material';
 import axios from 'axios';
-import AuthContext from '../../contexts/AuthContext';
+import AuthContext from '../contexts/AuthContext';
 
 // Reconstruct API_BASE_URL and axiosInstance
 const PORT = import.meta.env.VITE_PORT || '3001';

@@ -1,25 +1,23 @@
-const { KubeConfig, CoreV1Api } = require('@kubernetes/client-node');
+const { KubeConfig, CoreV1Api, NetworkingV1Api } = require('@kubernetes/client-node');
 const { db } = require('./drizzle-client'); // Import db
 const { app_settings } = require('../schema/schema'); // Import app_settings
 const { eq } = require('drizzle-orm'); // Import eq
 
 /**
- * @description Creates and returns a Kubernetes CoreV1Api client.
+ * @description Creates and returns a Kubernetes KubeConfig object.
  * It first attempts to load configuration from the local kubeconfig file.
  * If that fails, it attempts to load configuration from an in-cluster service account.
  * Logs the method used or errors encountered.
- * @returns {CoreV1Api} An instance of the Kubernetes CoreV1Api.
+ * @returns {KubeConfig|null} An instance of the Kubernetes KubeConfig or null if configuration fails.
  */
-function getK8sClient() {
+function getK8sConfig() {
   const kc = new KubeConfig();
-  let client;
 
   try {
     console.log('Attempting to load Kubernetes config from default kubeconfig...');
     kc.loadFromDefault();
     console.log('Successfully loaded Kubernetes config from default kubeconfig.');
-    client = kc.makeApiClient(CoreV1Api);
-    return client;
+    return kc;
   } catch (defaultError) {
     console.warn('Failed to load Kubernetes config from default kubeconfig:', defaultError.message);
     // Fallback to loading from in-cluster config
@@ -27,14 +25,24 @@ function getK8sClient() {
       console.log('Attempting to load Kubernetes config from cluster...');
       kc.loadFromCluster();
       console.log('Successfully loaded Kubernetes config from cluster.');
-      client = kc.makeApiClient(CoreV1Api);
-      return client;
+      return kc;
     } catch (e) {
       console.error('Failed to load Kubernetes config from cluster:', e.message);
       console.error('Could not load Kubernetes configuration from default or cluster. Check your kubeconfig or ensure app is running in-cluster.');
       return null; // Return null instead of throwing an error, so the app can continue running
     }
   }
+}
+
+/**
+ * @description Creates and returns a Kubernetes CoreV1Api client.
+ * @returns {CoreV1Api|null} An instance of the Kubernetes CoreV1Api or null if configuration fails.
+ */
+function getK8sClient() {
+  const kc = getK8sConfig();
+  if (!kc) return null;
+
+  return kc.makeApiClient(CoreV1Api);
 }
 
 /**
@@ -91,6 +99,17 @@ async function getTargetNamespace(returnAll = false) {
 }
 
 /**
+ * @description Creates and returns a Kubernetes NetworkingV1Api client.
+ * @returns {NetworkingV1Api|null} An instance of the Kubernetes NetworkingV1Api or null if configuration fails.
+ */
+function getK8sNetworkingClient() {
+  const kc = getK8sConfig();
+  if (!kc) return null;
+
+  return kc.makeApiClient(NetworkingV1Api);
+}
+
+/**
  * Creates a mock Kubernetes client for development environments
  * @returns {Object} A mock K8s client with basic functionality
  */
@@ -111,5 +130,6 @@ function createMockK8sClient() {
 module.exports = {
   getK8sClient,
   getTargetNamespace,
+  getK8sNetworkingClient,
   createMockK8sClient
 };

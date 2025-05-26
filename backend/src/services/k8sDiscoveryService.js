@@ -1,5 +1,4 @@
-const { getK8sClient, getTargetNamespace } = require('../config/k8s-client');
-const { NetworkingV1Api } = require('@kubernetes/client-node');
+const { getK8sNetworkingClient, getTargetNamespace } = require('../config/k8s-client');
 const { db } = require('../config/drizzle-client');
 const { monitored_endpoints } = require('../schema/schema');
 const { eq, and, or, notInArray, sql } = require('drizzle-orm');
@@ -9,9 +8,9 @@ const { eq, and, or, notInArray, sql } = require('drizzle-orm');
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of discovered endpoint objects.
  */
 async function discoverIngressEndpoints() {
-    const k8sNetworkingV1Api = getK8sClient()?.makeApiClient(NetworkingV1Api);
+    const k8sNetworkingV1Api = getK8sNetworkingClient();
     if (!k8sNetworkingV1Api) {
-        console.error('[K8sDiscoveryService] Kubernetes client not available. Skipping Ingress discovery.');
+        console.error('[K8sDiscoveryService] Kubernetes networking client not available. Skipping Ingress discovery.');
         return [];
     }
 
@@ -28,7 +27,7 @@ async function discoverIngressEndpoints() {
         try {
             console.log(`[K8sDiscoveryService] Fetching Ingresses for namespace: ${namespace}`);
             const res = await k8sNetworkingV1Api.listNamespacedIngress(namespace);
-            
+
             if (!res || !res.body || !res.body.items) {
                 console.warn(`[K8sDiscoveryService] No Ingress items found or invalid response for namespace: ${namespace}`);
                 continue;
@@ -54,7 +53,7 @@ async function discoverIngressEndpoints() {
                         if (!path.startsWith('/')) {
                             path = '/' + path;
                         }
-                        
+
                         let protocol = 'http';
                         if (ingress.spec.tls) {
                             for (const tls of ingress.spec.tls) {
@@ -64,7 +63,7 @@ async function discoverIngressEndpoints() {
                                 }
                             }
                         }
-                        
+
                         const constructedUrl = `${protocol}://${host}${path}`;
                         const endpointName = `${ingress.metadata.name}-${host}${path === '/' ? '' : path.replace(/\//g, '-')}`;
 
@@ -104,7 +103,7 @@ async function reconcileEndpoints(discoveredEndpoints) {
 
     const discoveredUrls = discoveredEndpoints.map(e => e.url);
     const existingActiveDbUrls = existingDbEndpoints.filter(e => !e.is_deleted).map(e => e.url);
-    
+
     let newEndpointsAdded = 0;
     let endpointsMarkedDeleted = 0;
     let endpointsReactivated = 0;
@@ -123,7 +122,7 @@ async function reconcileEndpoints(discoveredEndpoints) {
                 newEndpointsAdded++;
                 console.log(`[K8sDiscoveryService] Added new endpoint: ${epToAdd.name} (${epToAdd.url})`);
             } catch (error) {
-                 // Handle potential unique constraint violation if URL somehow exists (e.g. as 'custom' type)
+                // Handle potential unique constraint violation if URL somehow exists (e.g. as 'custom' type)
                 if (error.message && error.message.includes('duplicate key value violates unique constraint "monitored_endpoints_url_unique"')) {
                     console.warn(`[K8sDiscoveryService] Endpoint URL ${epToAdd.url} already exists (possibly as a custom type or race condition). Skipping addition.`);
                 } else {
@@ -148,10 +147,10 @@ async function reconcileEndpoints(discoveredEndpoints) {
                 notInArray(monitored_endpoints.url, discoveredUrls) // Double check condition from original logic. More direct: inArray(monitored_endpoints.url, urlsToMarkDeleted)
             ));
         endpointsMarkedDeleted = urlsToMarkDeleted.length; // This count might be slightly off if using notInArray like this.
-                                                       // A more accurate way: count based on actual update result or use the length of urlsToMarkDeleted
+        // A more accurate way: count based on actual update result or use the length of urlsToMarkDeleted
         console.log(`[K8sDiscoveryService] Marked ${endpointsMarkedDeleted} endpoints as deleted: ${urlsToMarkDeleted.join(', ')}`);
     }
-    
+
     // 3. Reactivate endpoints that were previously marked as deleted but are now re-discovered
     const endpointsToReactivate = [];
     for (const de of discoveredEndpoints) {
@@ -169,13 +168,13 @@ async function reconcileEndpoints(discoveredEndpoints) {
 
     for (const epToReactivate of endpointsToReactivate) {
         await db.update(monitored_endpoints)
-            .set({ 
-                is_deleted: false, 
+            .set({
+                is_deleted: false,
                 name: epToReactivate.name,
                 source_namespace: epToReactivate.source_namespace,
                 source_resource_name: epToReactivate.source_resource_name,
                 source_resource_kind: epToReactivate.source_resource_kind,
-                updated_at: new Date() 
+                updated_at: new Date()
             })
             .where(eq(monitored_endpoints.id, epToReactivate.id));
         endpointsReactivated++;
@@ -196,8 +195,8 @@ async function runDiscoveryAndReconciliation() {
         if (discoveredEndpoints && discoveredEndpoints.length > 0) {
             await reconcileEndpoints(discoveredEndpoints);
         } else if (discoveredEndpoints) { // Array exists but is empty
-             console.log('[K8sDiscoveryService] No Ingress endpoints discovered. Attempting reconciliation for potential deletions.');
-             await reconcileEndpoints([]); // Pass empty array to mark all auto-discovered as deleted if not found
+            console.log('[K8sDiscoveryService] No Ingress endpoints discovered. Attempting reconciliation for potential deletions.');
+            await reconcileEndpoints([]); // Pass empty array to mark all auto-discovered as deleted if not found
         } else {
             console.log('[K8sDiscoveryService] Ingress discovery did not return a valid list. Skipping reconciliation.');
         }

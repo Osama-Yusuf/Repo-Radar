@@ -21,6 +21,7 @@ import AuthPage from './pages/AuthPage';
 import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities';
 import SettingsPage from './pages/SettingsPage'; // Import SettingsPage
 import SecretDetectionPage from './pages/SecretDetectionPage'; // Import SecretDetectionPage
+import AppStatusPage from './pages/AppStatusPage'; // Import AppStatusPage
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -712,8 +713,8 @@ function App() {
                     <SideNav />
                     <Box sx={{ flex: 1, ml: '80px' }}>
                       <Header
-                        onRefresh={() => {}} // No global refresh, page handles its own data
-                        onAddProject={() => {}} // No add project button on this page
+                        onRefresh={() => { }} // No global refresh, page handles its own data
+                        onAddProject={() => { }} // No add project button on this page
                         isRefreshing={false}
                         showAddProjectButton={false} // Hide add project button
                       />
@@ -736,6 +737,23 @@ function App() {
                         showAddProjectButton={false} // Hide add project button
                       />
                       <SettingsPage />
+                    </Box>
+                  </>
+                </AdminRoute>
+              } />
+
+              <Route path="/app-status" element={
+                <AdminRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => { }} // No global refresh, app status page handles its own data
+                        onAddProject={() => { }} // No add project button on app status
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
+                      />
+                      <AppStatusPage />
                     </Box>
                   </>
                 </AdminRoute>

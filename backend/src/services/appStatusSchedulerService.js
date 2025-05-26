@@ -23,8 +23,12 @@ async function performChecks() {
                 eq(monitored_endpoints.is_deleted, false),
                 or(
                     isNull(monitored_endpoints.last_checked_at),
-                    // Using sql directly for date arithmetic as Drizzle's type system can be tricky with intervals here
-                    sql`${monitored_endpoints.last_checked_at} <= ${new Date(now.getTime() - monitored_endpoints.check_interval_seconds * 1000)}`
+                    // Use a safer approach for date comparison
+                    sql`CASE 
+                          WHEN ${monitored_endpoints.last_checked_at} IS NULL THEN TRUE
+                          WHEN ${monitored_endpoints.check_interval_seconds} IS NULL THEN TRUE
+                          ELSE ${monitored_endpoints.last_checked_at} <= NOW() - (${monitored_endpoints.check_interval_seconds} * INTERVAL '1 second')
+                        END`
                 )
             ));
 
@@ -52,7 +56,7 @@ async function performChecks() {
                 await db.update(monitored_endpoints)
                     .set({ last_checked_at: new Date(), updated_at: new Date() })
                     .where(eq(monitored_endpoints.id, endpoint.id));
-                
+
                 console.log(`[AppStatusScheduler] Endpoint ${endpoint.name} check complete. Status OK: ${checkResult.statusOk}, Code: ${checkResult.statusCode}, Time: ${checkResult.responseTimeMs}ms`);
 
             } catch (error) {
@@ -65,7 +69,7 @@ async function performChecks() {
                         status_ok: false,
                         error_message: `Scheduler Error: ${error.message}`,
                     });
-                     await db.update(monitored_endpoints)
+                    await db.update(monitored_endpoints)
                         .set({ last_checked_at: new Date(), updated_at: new Date() }) // Still update last_checked_at to avoid rapid retries on scheduler error
                         .where(eq(monitored_endpoints.id, endpoint.id));
                 } catch (dbError) {

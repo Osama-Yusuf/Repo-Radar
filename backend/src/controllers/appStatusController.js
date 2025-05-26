@@ -1,6 +1,6 @@
 const { db } = require('../config/drizzle-client');
 const { monitored_endpoints, endpoint_status_history } = require('../schema/schema');
-const { eq, desc, and, sql, gte, lte, isNull } = require('drizzle-orm');
+const { eq, desc, asc, and, sql, gte, lte, isNull } = require('drizzle-orm');
 
 class AppStatusController {
     constructor(dbInstance) {
@@ -28,7 +28,7 @@ class AppStatusController {
                     // created_at and updated_at will use defaultNow()
                 })
                 .returning();
-            
+
             // Manually trigger an initial check if the scheduler service is available
             // For now, just return the created endpoint
             // if (this.appStatusSchedulerService) {
@@ -50,7 +50,7 @@ class AppStatusController {
         const { name, url, check_interval_seconds } = req.body;
 
         if (isNaN(parseInt(endpointId))) {
-            return res.status(400).json({ error: 'Invalid endpoint ID.'});
+            return res.status(400).json({ error: 'Invalid endpoint ID.' });
         }
 
         const updates = { updated_at: new Date() };
@@ -64,9 +64,9 @@ class AppStatusController {
                 return res.status(400).json({ error: 'Invalid check interval. Must be at least 15 seconds.' });
             }
         }
-        
+
         if (Object.keys(updates).length === 1 && 'updated_at' in updates) {
-             return res.status(400).json({ error: 'No update fields provided.' });
+            return res.status(400).json({ error: 'No update fields provided.' });
         }
 
         try {
@@ -93,8 +93,8 @@ class AppStatusController {
 
     async deleteCustomEndpoint(req, res) {
         const { endpointId } = req.params;
-         if (isNaN(parseInt(endpointId))) {
-            return res.status(400).json({ error: 'Invalid endpoint ID.'});
+        if (isNaN(parseInt(endpointId))) {
+            return res.status(400).json({ error: 'Invalid endpoint ID.' });
         }
 
         try {
@@ -149,8 +149,8 @@ class AppStatusController {
     async getEndpointHistory(req, res) {
         const { endpointId } = req.params;
         const { range, startDate, endDate } = req.query;
-         if (isNaN(parseInt(endpointId))) {
-            return res.status(400).json({ error: 'Invalid endpoint ID.'});
+        if (isNaN(parseInt(endpointId))) {
+            return res.status(400).json({ error: 'Invalid endpoint ID.' });
         }
 
         let startTime;
@@ -172,7 +172,7 @@ class AppStatusController {
                     lte(endpoint_status_history.timestamp, endTime)
                 ))
                 .orderBy(asc(endpoint_status_history.timestamp)); // Changed to asc as per prompt
-            
+
             res.status(200).json(history);
         } catch (error) {
             console.error('Error fetching endpoint history:', error);
