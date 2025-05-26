@@ -201,7 +201,7 @@ const AppStatusPage = () => {
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Tooltip title="Refresh List">
-          <IconButton onClick={fetchEndpoints} disabled={loadingEndpoints}>
+          <IconButton onClick={fetchEndpoints} disabled={loadingEndpoints} sx={{ color: 'white' }}>
             <RefreshIcon />
           </IconButton>
         </Tooltip>
@@ -218,13 +218,55 @@ const AppStatusPage = () => {
           boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
-          <CardContent sx={{ textAlign: 'center', py: 6 }}>
-            <Typography variant="h6" sx={{ color: 'text.secondary', mb: 2 }}>
+          <CardContent sx={{
+            textAlign: 'center',
+            py: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3
+          }}>
+            <Box
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+                boxShadow: '0 10px 20px rgba(37, 117, 252, 0.2)',
+                mb: 2
+              }}
+            >
+              <Typography variant="h4" sx={{ color: '#fff', fontWeight: 'bold' }}>
+                0
+              </Typography>
+            </Box>
+            <Typography variant="h5" sx={{ color: '#fff', fontWeight: 'medium', mb: 1 }}>
               No monitored endpoints found
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {canModify ? 'Click the "Add Custom Endpoint" button to start monitoring your first endpoint.' : 'No endpoints have been configured yet.'}
+            <Typography variant="body1" sx={{ color: '#90CAF9', maxWidth: 450 }}>
+              {canModify ?
+                'Click the "Add Custom Endpoint" button above to start monitoring your first endpoint. You can monitor any HTTP endpoint for uptime and performance.' :
+                'No endpoints have been configured yet. Please contact an administrator to set up endpoint monitoring.'}
             </Typography>
+            {canModify && (
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={handleOpenAddDialog}
+                sx={{
+                  mt: 2,
+                  background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5c0fb1 0%, #1e68e3 100%)',
+                  }
+                }}
+              >
+                Add Custom Endpoint
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
