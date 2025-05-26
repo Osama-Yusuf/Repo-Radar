@@ -298,7 +298,7 @@ const AppStatusPage = () => {
             <Grid item xs={6} sm={4} md={2}>
               <Box sx={{ textAlign: 'center', p: 1 }}>
                 <Typography variant="h4" sx={{ color: '#90CAF9', fontWeight: 'bold' }}>
-                  {endpoints.filter(e => e.type === 'discovered').length}
+                  {endpoints.filter(e => e.type === 'auto-discovered').length}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#90CAF9' }}>
                   Discovered
@@ -371,7 +371,7 @@ const AppStatusPage = () => {
             >
               <MenuItem value="all">All Types</MenuItem>
               <MenuItem value="custom">Custom</MenuItem>
-              <MenuItem value="discovered">Discovered</MenuItem>
+              <MenuItem value="auto-discovered">Discovered</MenuItem>
             </Select>
           </FormControl>
 
