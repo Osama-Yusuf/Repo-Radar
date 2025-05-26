@@ -121,24 +121,35 @@ const DeploymentVulnerabilities = () => {
         </Typography>
         {availableNamespaces.length > 0 && (
           <FormControl sx={{ m: 1, minWidth: 200 }} size="small">
-            <InputLabel id="namespace-select-label-vuln" sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>Namespace</InputLabel>
+            <InputLabel id="namespace-select-label-vuln" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Namespace</InputLabel>
             <Select
               labelId="namespace-select-label-vuln"
               value={selectedNamespace}
               label="Namespace"
               onChange={(e) => setSelectedNamespace(e.target.value)}
-              sx={{ 
-                // Assuming a light theme for this page based on typical Material-UI defaults
-                // If your app has a dark theme, adjust these colors
-                color: 'black', 
-                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.23)' },
-                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.87)' },
-                '.MuiSvgIcon-root': { color: 'rgba(0, 0, 0, 0.54)' },
+              sx={{
+                color: '#fff',
+                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.23)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.7)' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#2196f3' },
+                '.MuiSvgIcon-root': { color: 'rgba(255, 255, 255, 0.7)' },
               }}
               MenuProps={{
                 PaperProps: {
                   sx: {
-                    // Standard dropdown appearance
+                    backgroundColor: '#252536',
+                    color: '#fff',
+                    '& .MuiMenuItem-root': {
+                      '&:hover': {
+                        backgroundColor: 'rgba(33, 150, 243, 0.08)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(33, 150, 243, 0.15)',
+                        '&:hover': {
+                          backgroundColor: 'rgba(33, 150, 243, 0.25)',
+                        },
+                      },
+                    },
                   },
                 },
               }}
@@ -157,9 +168,9 @@ const DeploymentVulnerabilities = () => {
         </Typography>
       )}
       {deployments.map((deployment) => (
-        <DeploymentVulnerabilityCard 
-          key={`${deployment.namespace}-${deployment.deploymentName}`} 
-          deployment={deployment} 
+        <DeploymentVulnerabilityCard
+          key={`${deployment.namespace}-${deployment.deploymentName}`}
+          deployment={deployment}
           selectedNamespace={selectedNamespace} // Pass selectedNamespace if card needs it
         />
       ))}

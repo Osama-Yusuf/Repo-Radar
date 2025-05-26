@@ -4,7 +4,7 @@ import {
     Tabs, Tab, TextField, Button, Paper, Typography, Box, CircularProgress, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem, FormControl, InputLabel,
-    useTheme, alpha
+    useTheme, alpha, Divider
 } from '@mui/material';
 import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
@@ -234,13 +234,15 @@ const SettingsPage = () => {
         return (
             <Paper sx={{
                 p: 3,
-                backgroundColor: '#1e1e2d',
+                backgroundColor: '#1a1a27',
                 color: '#fff',
                 borderRadius: 2,
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
             }}>
-                <Typography variant="h6" color="error">Access Denied</Typography>
-                <Typography>You do not have permission to view this page.</Typography>
+                <Typography variant="h6" color="error" sx={{ fontWeight: 600 }}>Access Denied</Typography>
+                <Typography sx={{ opacity: 0.8, mt: 1 }}>You do not have permission to view this page.</Typography>
             </Paper>
         );
     }
@@ -248,18 +250,31 @@ const SettingsPage = () => {
     // Dark theme styles for form inputs
     const inputSx = {
         '& .MuiOutlinedInput-root': {
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            backdropFilter: 'blur(10px)',
             '& fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.23)',
+                borderColor: 'rgba(33, 150, 243, 0.2)',
+                transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
             },
             '&:hover fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.5)',
+                borderColor: 'rgba(33, 150, 243, 0.5)',
             },
             '&.Mui-focused fieldset': {
                 borderColor: '#2196f3',
+                boxShadow: '0 0 10px rgba(33, 150, 243, 0.5)',
             },
+            transition: 'transform 0.2s ease, box-shadow 0.3s ease',
+            '&:focus-within': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 5px 15px rgba(0, 0, 0, 0.3)',
+            }
         },
         '& .MuiInputLabel-root': {
             color: 'rgba(255, 255, 255, 0.7)',
+            '&.Mui-focused': {
+                color: '#2196f3',
+                textShadow: '0 0 5px rgba(33, 150, 243, 0.5)',
+            }
         },
         '& .MuiInputBase-input': {
             color: '#fff',
@@ -270,21 +285,89 @@ const SettingsPage = () => {
         <Paper sx={{
             m: 2,
             p: 0,
-            backgroundColor: '#1e1e2d',
+            backgroundColor: '#0a0a1e',
+            backgroundImage: 'radial-gradient(circle at 50% 0%, #1a1a40 0%, transparent 50%)',
             color: '#fff',
-            borderRadius: 2,
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-            overflow: 'hidden'
+            borderRadius: '24px',
+            boxShadow: '0 20px 80px rgba(0, 0, 0, 0.6), 0 0 20px rgba(33, 150, 243, 0.15)',
+            overflow: 'hidden',
+            border: '1px solid rgba(33, 150, 243, 0.1)',
+            position: 'relative',
+            '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '1px',
+                background: 'linear-gradient(90deg, rgba(33, 150, 243, 0), rgba(33, 150, 243, 0.8), rgba(33, 150, 243, 0))',
+            },
         }}>
             <Box sx={{
-                p: 3,
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'linear-gradient(90deg, #1a1a27 0%, #2d325a 100%)'
+                p: 4,
+                borderBottom: '1px solid rgba(33, 150, 243, 0.1)',
+                background: 'linear-gradient(135deg, #0c0c20 0%, #1e2151 100%)',
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: '-50%',
+                    right: '-10%',
+                    width: '500px',
+                    height: '500px',
+                    background: 'radial-gradient(circle, rgba(33, 150, 243, 0.05) 0%, transparent 70%)',
+                    animation: 'pulse 15s infinite',
+                },
+                '@keyframes pulse': {
+                    '0%': { opacity: 0.3 },
+                    '50%': { opacity: 0.8 },
+                    '100%': { opacity: 0.3 },
+                }
             }}>
-                <Typography variant="h4" fontWeight="500">Settings</Typography>
+                <Typography
+                    variant="h4"
+                    fontWeight="600"
+                    sx={{
+                        position: 'relative',
+                        display: 'inline-block',
+                        background: 'linear-gradient(90deg, #fff, #2196f3)',
+                        backgroundClip: 'text',
+                        textFillColor: 'transparent',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            bottom: -8,
+                            left: 0,
+                            width: '60px',
+                            height: '3px',
+                            background: 'linear-gradient(90deg, #2196f3, rgba(33, 150, 243, 0.3))',
+                            borderRadius: '2px',
+                        }
+                    }}
+                >
+                    Settings
+                </Typography>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        mt: 1,
+                        opacity: 0.7,
+                        maxWidth: '60%',
+                    }}
+                >
+                    Configure application settings and manage user access
+                </Typography>
             </Box>
 
-            <Box sx={{ borderBottom: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <Box sx={{
+                borderBottom: 1,
+                borderColor: 'rgba(255, 255, 255, 0.05)',
+                position: 'relative',
+                zIndex: 1,
+            }}>
                 <Tabs
                     value={tabValue}
                     onChange={handleTabChange}
@@ -292,11 +375,25 @@ const SettingsPage = () => {
                     sx={{
                         '& .MuiTabs-indicator': {
                             backgroundColor: '#2196f3',
+                            height: '3px',
+                            borderRadius: '3px 3px 0 0',
+                            boxShadow: '0 0 8px rgba(33, 150, 243, 0.8)',
                         },
                         '& .MuiTab-root': {
-                            color: 'rgba(255, 255, 255, 0.7)',
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            fontWeight: 500,
+                            fontSize: '0.95rem',
+                            textTransform: 'none',
+                            transition: 'all 0.3s ease',
+                            py: 2,
                             '&.Mui-selected': {
                                 color: '#2196f3',
+                                textShadow: '0 0 10px rgba(33, 150, 243, 0.5)',
+                            },
+                            '&:hover': {
+                                color: 'rgba(33, 150, 243, 0.8)',
+                                backgroundColor: 'rgba(33, 150, 243, 0.08)',
+                                transform: 'translateY(-2px)',
                             },
                         },
                     }}
@@ -358,9 +455,32 @@ const SettingsPage = () => {
                             sx={{
                                 mt: 3,
                                 width: 'fit-content',
-                                backgroundColor: '#2196f3',
+                                backgroundColor: 'rgba(33, 150, 243, 0.8)',
+                                backgroundImage: 'linear-gradient(135deg, #2196f3, #0d47a1)',
+                                boxShadow: '0 4px 20px rgba(33, 150, 243, 0.4)',
+                                transition: 'all 0.3s ease',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                '&::before': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: '-100%',
+                                    width: '100%',
+                                    height: '100%',
+                                    background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
+                                    transition: 'all 0.6s ease',
+                                },
                                 '&:hover': {
                                     backgroundColor: '#1976d2',
+                                    transform: 'translateY(-3px)',
+                                    boxShadow: '0 7px 30px rgba(33, 150, 243, 0.6)',
+                                    '&::before': {
+                                        left: '100%',
+                                    }
+                                },
+                                '&:active': {
+                                    transform: 'translateY(1px)',
                                 }
                             }}
                             disabled={loadingGeneralSettings}
@@ -392,47 +512,110 @@ const SettingsPage = () => {
                 {usersError && <Alert severity="error" sx={{ mb: 2, backgroundColor: alpha('#f44336', 0.1), color: '#f44336' }}>{usersError}</Alert>}
                 {usersSuccess && <Alert severity="success" sx={{ mb: 2, backgroundColor: alpha('#4caf50', 0.1), color: '#4caf50' }}>{usersSuccess}</Alert>}
 
-                <TableContainer component={Paper} sx={{ backgroundColor: '#252536', boxShadow: 'none', borderRadius: 1 }}>
+                <TableContainer component={Paper} sx={{
+                    backgroundColor: 'rgba(20, 20, 40, 0.6)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(33, 150, 243, 0.1)',
+                    overflow: 'hidden',
+                }}>
                     <Table sx={{ minWidth: 650 }} aria-label="user management table">
                         <TableHead>
-                            <TableRow>
-                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Username</TableCell>
-                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Role</TableCell>
-                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Created At</TableCell>
-                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Updated At</TableCell>
-                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Actions</TableCell>
+                            <TableRow sx={{
+                                background: 'linear-gradient(90deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05))'
+                            }}>
+                                <TableCell sx={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    borderBottom: '1px solid rgba(33, 150, 243, 0.2)',
+                                    fontWeight: 500,
+                                }}>Username</TableCell>
+                                <TableCell sx={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    borderBottom: '1px solid rgba(33, 150, 243, 0.2)',
+                                    fontWeight: 500,
+                                }}>Role</TableCell>
+                                <TableCell sx={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    borderBottom: '1px solid rgba(33, 150, 243, 0.2)',
+                                    fontWeight: 500,
+                                }}>Created At</TableCell>
+                                <TableCell sx={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    borderBottom: '1px solid rgba(33, 150, 243, 0.2)',
+                                    fontWeight: 500,
+                                }}>Updated At</TableCell>
+                                <TableCell sx={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    borderBottom: '1px solid rgba(33, 150, 243, 0.2)',
+                                    fontWeight: 500,
+                                }}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {users.map((u) => (
-                                <TableRow key={u.id} sx={{ '&:hover': { backgroundColor: 'rgba(33, 150, 243, 0.08)' } }}>
-                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{u.username}</TableCell>
-                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                <TableRow key={u.id} sx={{
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                        transform: 'scale(1.01)',
+                                        boxShadow: 'inset 0 0 20px rgba(33, 150, 243, 0.05)'
+                                    }
+                                }}>
+                                    <TableCell sx={{
+                                        color: '#fff',
+                                        borderBottom: '1px solid rgba(33, 150, 243, 0.1)'
+                                    }}>
+                                        {u.username}
+                                    </TableCell>
+                                    <TableCell sx={{
+                                        color: '#fff',
+                                        borderBottom: '1px solid rgba(33, 150, 243, 0.1)'
+                                    }}>
                                         <Box sx={{
                                             display: 'inline-block',
                                             px: 1.5,
                                             py: 0.5,
-                                            borderRadius: 1,
-                                            backgroundColor: u.role === 'admin' ? 'rgba(33, 150, 243, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '20px',
+                                            backgroundColor: u.role === 'admin' ? 'rgba(33, 150, 243, 0.15)' : 'rgba(255, 255, 255, 0.05)',
                                             color: u.role === 'admin' ? '#2196f3' : '#fff',
                                             fontSize: '0.75rem',
-                                            fontWeight: 500
+                                            fontWeight: 500,
+                                            border: u.role === 'admin' ? '1px solid rgba(33, 150, 243, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                            boxShadow: u.role === 'admin' ? '0 0 10px rgba(33, 150, 243, 0.2)' : 'none',
+                                            textShadow: u.role === 'admin' ? '0 0 5px rgba(33, 150, 243, 0.5)' : 'none',
                                         }}>
                                             {u.role}
                                         </Box>
                                     </TableCell>
-                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{new Date(u.createdAt).toLocaleString()}</TableCell>
-                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{new Date(u.updatedAt).toLocaleString()}</TableCell>
-                                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                    <TableCell sx={{
+                                        color: '#fff',
+                                        borderBottom: '1px solid rgba(33, 150, 243, 0.1)'
+                                    }}>
+                                        {new Date(u.createdAt).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell sx={{
+                                        color: '#fff',
+                                        borderBottom: '1px solid rgba(33, 150, 243, 0.1)'
+                                    }}>
+                                        {new Date(u.updatedAt).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell sx={{
+                                        borderBottom: '1px solid rgba(33, 150, 243, 0.1)'
+                                    }}>
                                         <Button
                                             size="small"
                                             onClick={() => handleEditUserDialogOpen(u)}
                                             sx={{
                                                 mr: 1,
-                                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                                backgroundColor: 'rgba(33, 150, 243, 0.1)',
                                                 color: '#fff',
+                                                borderRadius: '8px',
+                                                transition: 'all 0.2s ease',
                                                 '&:hover': {
-                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                    backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)'
                                                 },
                                                 '&.Mui-disabled': {
                                                     color: 'rgba(255, 255, 255, 0.3)',
@@ -449,8 +632,12 @@ const SettingsPage = () => {
                                             disabled={u.id === currentUser.id}
                                             sx={{
                                                 backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                                                borderRadius: '8px',
+                                                transition: 'all 0.2s ease',
                                                 '&:hover': {
                                                     backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)'
                                                 },
                                                 '&.Mui-disabled': {
                                                     color: 'rgba(255, 255, 255, 0.3)',
