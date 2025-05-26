@@ -20,7 +20,7 @@ For each check interval:
    - Each branch is checked independently
 
 2. **GitHub API Integration**:
-   - Uses Octokit to fetch the latest commit for each branch
+   - Uses Octokit (via `GitHubService`) to fetch the latest commit for each branch
    - Compares the latest commit SHA with the stored SHA
    - If different, marks as a change
 
@@ -46,22 +46,28 @@ For each check interval:
      - Captures output and errors
      - Cleans up temporary files
 
-#### 3. Error Handling
+5. **Secret Scanning (GitLeaks)**:
+   - After changes are detected and initial logging is done, the `GitleaksScanService` (`projectService.js` calls `gitleaksScan` from this service) is invoked.
+   - This service uses the GitLeaks CLI to scan the repository from its first commit up to the latest detected commit. The GitHub token from application settings is used to authenticate with GitHub for accessing repositories.
+   - Any identified secrets are parsed and stored in the `gitleaks_findings` database table for review. Old findings for the project are cleared before new ones are inserted.
+
+#### 3. Error Handling (Renumbered from original plan, should be part of Check Process Flow)
 - Each check operation is wrapped in try-catch blocks
 - Errors are logged but don't stop the monitoring process
 - Failed checks are recorded in the logs
 - Individual action failures don't affect other actions
+- GitLeaks scan failures are also logged and reflected in the `check_logs` status.
 
-#### 4. Database Updates
+#### 4. Database Updates (Renumbered)
 The system maintains several tables that are updated during the monitoring process:
 - `projects`: Stores project configurations
 - `branches`: Tracks branch states and last commit SHAs
-- `check_logs`: Records all check operations and their results
+- `check_logs`: Records all check operations and their results (including GitLeaks scan status)
 - `actions`: Stores webhook URLs and script contents
 - `secrets`: Manages environment variables for scripts
+- `gitleaks_findings`: Stores results from GitLeaks scans (newly added).
 
 ### Kubernetes Integration
-
 The backend integrates with Kubernetes to monitor deployments and scan container images for vulnerabilities:
 
 #### 1. Kubernetes Client Configuration
@@ -92,7 +98,6 @@ The backend integrates with Kubernetes to monitor deployments and scan container
 - Maintains raw scan output for detailed analysis and debugging
 
 ### Tekton CI/CD Integration
-
 The backend integrates with Tekton to provide visibility into CI/CD pipelines:
 
 #### 1. Pipeline Run Monitoring
@@ -121,75 +126,125 @@ The backend integrates with Tekton to provide visibility into CI/CD pipelines:
 
 ### Architecture Overview
 
-The backend is built using Express.js and SQLite, providing a RESTful API for managing repository monitoring and automated actions.
+The backend is built using Express.js and Drizzle ORM for database interactions (PostgreSQL in production, SQLite for local dev/testing might be an option if schema adjusted), providing a RESTful API for managing repository monitoring and automated actions.
 
 ### Database Schema
 
-The backend uses SQLite with the following tables:
+The backend uses a PostgreSQL database (managed by Drizzle ORM) with the following tables:
 
 - **projects**: Stores repository monitoring configurations
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - name: TEXT
-  - repo_url: TEXT
-  - check_interval: INTEGER (minutes)
-  - last_check: TEXT (ISO timestamp)
-  - created_at: TEXT
+  - id: serial PRIMARY KEY
+  - name: text NOT NULL
+  - repo_url: text NOT NULL
+  - check_interval: integer DEFAULT 5 NOT NULL
+  - created_at: timestamp DEFAULT now() NOT NULL
+  - updated_at: timestamp DEFAULT now() NOT NULL
   ```
 
 - **branches**: Stores branch configurations for each project
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - project_id: INTEGER (foreign key)
-  - branch_name: TEXT
+  - id: serial PRIMARY KEY
+  - project_id: integer NOT NULL (references projects.id, onDelete: 'cascade')
+  - branch_name: text NOT NULL
+  - last_commit_sha: text
   ```
 
 - **actions**: Stores webhook and script actions for projects
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - project_id: INTEGER (foreign key)
-  - name: TEXT
-  - action_type: TEXT ('webhook' or 'script')
-  - webhook_url: TEXT
-  - script_content: TEXT
+  - id: serial PRIMARY KEY
+  - project_id: integer NOT NULL (references projects.id, onDelete: 'cascade')
+  - name: text
+  - action_type: text NOT NULL
+  - webhook_url: text
+  - script_content: text
+  - created_at: timestamp DEFAULT now() NOT NULL
+  - updated_at: timestamp DEFAULT now() NOT NULL
   ```
 
-- **logs**: Stores execution history
+- **check_logs**: Stores execution history (was 'logs' previously)
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - project_id: INTEGER
-  - commit_hash: TEXT
-  - commit_message: TEXT
-  - branch: TEXT
-  - status: TEXT
-  - created_at: TEXT
+  - id: serial PRIMARY KEY
+  - project_id: integer NOT NULL (references projects.id, onDelete: 'cascade')
+  - branch_name: text NOT NULL
+  - commit_sha: text
+  - commit_message: text
+  - commit_author: text
+  - commit_date: timestamp
+  - checked_at: timestamp DEFAULT now() NOT NULL
+  - status: text NOT NULL 
   ```
 
 - **tracked_images**: Stores container image information
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - image_name: TEXT
-  - image_tag: TEXT
-  - image_digest: TEXT
-  - last_scan: TEXT (ISO timestamp)
+  - id: serial PRIMARY KEY
+  - image_name: text NOT NULL
+  - image_tag: text NOT NULL
+  - image_digest: text
+  - namespace: text
+  - last_seen_at: timestamp DEFAULT now() NOT NULL
+  - last_scanned_at: timestamp DEFAULT now() NOT NULL
+  - scan_status: text NOT NULL
+  - raw_trivy_output: jsonb
+  - created_at: timestamp DEFAULT now() NOT NULL
+  - updated_at: timestamp DEFAULT now() NOT NULL
   ```
 
 - **image_vulnerabilities**: Stores vulnerability details for container images
   ```sql
-  - id: INTEGER PRIMARY KEY
-  - image_id: INTEGER (foreign key)
-  - cve_id: TEXT
-  - package_name: TEXT
-  - installed_version: TEXT
-  - fixed_version: TEXT
-  - severity: TEXT
-  - description: TEXT
+  - id: serial PRIMARY KEY
+  - tracked_image_id: integer NOT NULL (references tracked_images.id, onDelete: 'cascade')
+  - vulnerability_cve_id: text NOT NULL
+  - pkg_name: text NOT NULL
+  - installed_version: text NOT NULL
+  - fixed_version: text
+  - severity: text NOT NULL
+  - title: text
+  - description: text
+  - datasource: text
+  - created_at: timestamp DEFAULT now() NOT NULL
+  ```
+
+- **gitleaks_findings**: Stores detailed results from GitLeaks secret scans.
+  ```sql
+  - id: serial PRIMARY KEY
+  - project_id: integer NOT NULL (references projects.id, onDelete: 'cascade')
+  - description: text NOT NULL (Description of the rule that was triggered)
+  - secret: text NOT NULL (The actual secret/sensitive data found)
+  - file_path: text NOT NULL (Path to the file containing the secret)
+  - line_number: integer (Line number where the secret was found)
+  - commit_hash: text NOT NULL (Commit hash where the secret was introduced)
+  - author: text (Author of the commit)
+  - date: timestamp (Timestamp of the commit)
+  - tags: jsonb (JSON array of tags associated with the finding)
+  - rule_id: text NOT NULL (GitLeaks rule ID that was triggered)
+  - scanned_at: timestamp DEFAULT now() NOT NULL (Timestamp when the scan was performed)
+  - commit_url: text (URL to the specific commit, if available)
+  ```
+  
+- **users**: Stores user authentication data.
+  ```sql
+  - id: serial PRIMARY KEY
+  - username: varchar(50) NOT NULL UNIQUE
+  - password: text NOT NULL (Hashed password)
+  - role: varchar(10) DEFAULT 'user' NOT NULL
+  - created_at: timestamp DEFAULT now() NOT NULL
+  - updated_at: timestamp DEFAULT now() NOT NULL
+  ```
+
+- **app_settings**: Stores application-wide settings.
+  ```sql
+  - id: serial PRIMARY KEY (typically only one row with id=1)
+  - github_api_url: text
+  - github_token: text (Encrypted or handled securely)
+  - kubernetes_namespaces: jsonb DEFAULT '[]'::jsonb
+  - created_at: timestamp DEFAULT now() NOT NULL
+  - updated_at: timestamp DEFAULT now() NOT NULL
   ```
 
 ### API Endpoints
 
 #### Projects
-
 - **GET /api/projects**
   - Fetches all projects with their branches and actions
   - Response includes:
@@ -231,7 +286,6 @@ The backend uses SQLite with the following tables:
   - Deletes a project and its associated data
 
 #### Actions
-
 - **GET /api/projects/:projectId/actions**
   - Fetches all actions for a specific project
 
@@ -251,13 +305,11 @@ The backend uses SQLite with the following tables:
   - Deletes an action
 
 #### Logs
-
 - **GET /api/projects/:projectId/logs**
   - Fetches execution history for a project
   - Supports pagination and filtering
 
 #### Kubernetes Resources
-
 - **GET /api/k8s/pods**
   - Fetches all pods in the default namespace
   - Returns detailed information including:
@@ -281,7 +333,6 @@ The backend uses SQLite with the following tables:
     - Container image information
 
 #### Tekton CI/CD Pipelines
-
 - **GET /api/tekton/pipelineruns**
   - Fetches all pipeline runs in the devops namespace
   - Returns detailed information including:
@@ -302,7 +353,6 @@ The backend uses SQLite with the following tables:
   - Returns formatted logs with container names
 
 #### Vulnerability Management
-
 - **GET /api/vulnerabilities/images**
   - Fetches all tracked container images with their scan status
   - Returns image name, tag, digest, and last scan timestamp
@@ -316,8 +366,33 @@ The backend uses SQLite with the following tables:
     - Severity levels
     - Vulnerability descriptions
 
-### Background Processing
+#### Secret Findings
+- **GET /api/projects/:projectId/secret-findings**
+  - Fetches all GitLeaks secret findings for a specified project.
+  - Results are ordered by file path and then by line number (ascending).
+  - Returns an array of finding objects, structured according to the `gitleaks_findings` table schema.
+  ```javascript
+  [
+    {
+      "id": 1,
+      "projectId": 1,
+      "description": "AWS API Key",
+      "secret": "AKIA...",
+      "filePath": "src/config.js",
+      "lineNumber": 23,
+      "commitHash": "abcdef1234567890",
+      "author": "John Doe",
+      "date": "2023-01-15T10:00:00Z",
+      "tags": "[\"key\", \"aws\"]", // Stored as JSONB, will be actual JSON array
+      "ruleId": "aws-access-key",
+      "scannedAt": "2023-01-16T12:00:00Z",
+      "commitUrl": "https://github.com/user/repo/commit/abcdef1234567890"
+    }
+    // ... other findings
+  ]
+  ```
 
+### Background Processing
 The backend implements multiple background processes:
 
 1. Repository monitoring that:
@@ -325,6 +400,7 @@ The backend implements multiple background processes:
    - Uses GitHub API to fetch latest commits
    - Compares with last known state
    - Executes associated actions when changes are detected
+   - Triggers GitLeaks scans on detected changes.
 
 2. Kubernetes monitoring that:
    - Periodically scans the cluster for deployments
@@ -338,7 +414,6 @@ The backend implements multiple background processes:
    - Updates the database with pipeline information
 
 ### Error Handling
-
 - All endpoints return appropriate HTTP status codes
 - Database operations are wrapped in try-catch blocks
 - Actions execution is logged with detailed error information
@@ -347,54 +422,64 @@ The backend implements multiple background processes:
 
 1. Install dependencies:
    ```bash
-   npm install
+   npm install # or pnpm install if using pnpm
    ```
 
 2. Environment variables:
    ```
    PORT=3001
-   GITHUB_TOKEN=your_github_token
+   GITHUB_TOKEN=your_github_token        # Crucial for repository access (GitHubService) and effective secret scanning of private repositories (GitleaksScanService via application settings).
    KUBERNETES_CONTEXT=your_kube_context  # Optional, uses current context by default
    TEKTON_NAMESPACE=devops               # Optional, defaults to 'devops'
+   POSTGRESQL_USER=your_db_user
+   POSTGRESQL_PASSWORD=your_db_password
+   POSTGRESQL_HOST=localhost
+   POSTGRESQL_PORT=5432
+   POSTGRESQL_DATABASE=repo_radar
+   JWT_SECRET=your_jwt_secret_key      # For session management
    ```
+   **GitLeaks Execution Environment Requirements**:
+   - The backend requires `git` and `gitleaks` CLI tools to be installed and available in the system's PATH.
+   - The provided `backend/Dockerfile` handles the installation of GitLeaks.
+   - A `GITHUB_TOKEN` with appropriate read access to repositories is highly recommended (configured via application settings or the environment variable fallback) for GitLeaks to effectively scan private repositories.
 
 3. Start the server:
    ```bash
-   npm start
+   npm start # or pnpm start
    ```
 
 ## Development
 
-### Database Initialization
+### Database Initialization & Migrations
 
-The database is automatically initialized when the server starts:
-1. Checks if database file exists
-2. Creates tables if they don't exist
-3. Adds any missing columns to existing tables
+The database schema is managed by Drizzle ORM.
+- **Schema Definition**: Located in `src/schema/schema.js`.
+- **Migrations**: Run `pnpm drizzle-kit generate:pg` to generate migration files after schema changes.
+- **Applying Migrations**: Migrations are typically applied automatically on startup or via a dedicated script if preferred for production. The current `setup-db.js` script likely handles this.
 
 ### Adding New Features
-
 When adding new features:
-1. Update database schema if needed
-2. Add new API endpoints
-3. Update background processing if required
-4. Add appropriate error handling
-5. Update this documentation
+1. Update database schema in `src/schema/schema.js` if needed.
+2. Generate and apply migrations if the schema changed.
+3. Add new API endpoints in the relevant `routes` and `controllers`.
+4. Update background processing in `services` if required.
+5. Add appropriate error handling.
+6. Update this documentation and any relevant sections in the root `README.md`.
 
 ## Security Considerations
-
-1. All webhook URLs must be HTTPS
-2. Script actions are executed in a sandboxed environment
-3. GitHub token is required for repository access
-4. Input validation is performed on all endpoints
-5. Vulnerability scan results are stored securely in the database
-6. Raw scan output is preserved for audit purposes
-7. Kubernetes API access is limited to read-only operations
-8. Tekton pipeline logs may contain sensitive information and should be protected
+1. All webhook URLs must be HTTPS.
+2. Script actions are executed in a sandboxed environment.
+3. GitHub token (configured in Application Settings or via ENV) is required for repository access and secret scanning. Ensure it has the minimum necessary permissions.
+4. Input validation is performed on all API endpoints.
+5. Vulnerability scan results are stored securely in the database.
+6. Raw scan output for vulnerabilities is preserved for audit purposes.
+7. Kubernetes API access should be configured with least privilege.
+8. Tekton pipeline logs may contain sensitive information and access to them should be controlled.
+9. Regularly review GitLeaks findings and rotate any exposed secrets.
 
 ## Error Codes
-
 - 400: Bad Request (invalid input)
+- 401/403: Unauthorized/Forbidden (authentication/authorization issues)
 - 404: Resource Not Found
 - 500: Internal Server Error
-- 503: Service Unavailable (GitHub API issues)
+- 503: Service Unavailable (e.g., GitHub API issues)

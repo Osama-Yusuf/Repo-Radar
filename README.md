@@ -84,6 +84,11 @@ Get the most out of Repo-Radar with these advanced tips:
   - Real-time status updates
   - Comprehensive activity logs
 
+- **🛡️ Secret Detection**
+  - Leverages GitLeaks to automatically scan monitored repositories for secrets like API keys and credentials.
+  - Scans are triggered upon detection of new changes in a repository.
+  - Results are displayed on a dedicated "Secret Detection" page in the UI, helping to identify and mitigate risks from exposed secrets.
+
 ## ⚙️ Configuration & Administration
 
 Repo Radar now includes enhanced configuration options and role-based access control for better security and manageability.
@@ -99,7 +104,7 @@ Administrators can access the new **Settings** page via the sidebar. This page a
 
 While the Settings page is the primary source for these configurations, the application still supports environment variable fallbacks:
 *   `GITHUB_API_URL`: If not set in UI, the backend will check this environment variable.
-*   `GITHUB_TOKEN`: If not set in UI, the backend will check this environment variable.
+*   `GITHUB_TOKEN`: If not set in UI, the backend will check this environment variable. This token is also used by the Secret Detection feature for scanning repositories.
 *   `K8S_TARGET_NAMESPACE`: If no namespaces are configured in the UI, the backend will check this environment variable (for a single namespace), and finally default to `default` if neither UI nor ENV var is set.
 
 It's recommended to use the Settings page for managing these values after initial setup.
@@ -118,7 +123,7 @@ Repo Radar implements a two-tier role system to manage user permissions:
     *   Can manage all projects, actions, and view all logs.
 
 *   **User (`user`):**
-    *   Standard access to application features like viewing repositories, pod statuses, pipeline statuses, and vulnerabilities.
+    *   Standard access to application features like viewing repositories, pod statuses, pipeline statuses, vulnerabilities, and secret detection findings.
     *   Can manage projects and actions they have appropriate permissions for (based on future enhancements, currently all users can manage all projects).
     *   Cannot access the Settings page or perform user management tasks.
 
@@ -131,7 +136,7 @@ The first user registered in the application can be promoted to 'admin' via back
 ### Prerequisites
 - Docker
 - Docker Compose
-- GitHub Personal Access Token
+- GitHub Personal Access Token (with read access to repositories you want to scan)
 
 1. **Clone the repository**
    ```bash
@@ -141,7 +146,7 @@ The first user registered in the application can be promoted to 'admin' via back
    
 2. **Update .env file**
    ```bash
-   cp .env.example .env    # Configure your envs
+   cp .env.example .env    # Configure your envs, especially GITHUB_TOKEN
    ```
 
 3. **Build and Run Docker Compose**
@@ -149,12 +154,16 @@ The first user registered in the application can be promoted to 'admin' via back
    docker compose build
    docker compose up -d
    ```
+   (The Docker setup includes GitLeaks in the backend image.)
 
 ### 📦 Installation Using NPM
 
 ### Prerequisites
 - Node.js ≥ 18.0.0
 - GitHub Personal Access Token
+- GitLeaks CLI installed and in PATH (for the backend service)
+- Git CLI installed and in PATH (for the backend service)
+
 
 1. **Clone the repository**
    ```bash
@@ -203,20 +212,24 @@ The first user registered in the application can be promoted to 'admin' via back
    - View real-time status
    - Check commit history
    - Review action logs
+   - View Secret Detection findings for projects.
 
 ## 🏗️ Architecture
 
 - **Frontend**: React + Material UI
 - **Backend**: Node.js + Express
-- **Database**: SQLite
+- **Database**: SQLite (Drizzle ORM)
 - **API**: GitHub REST API v3
+- **Secret Scanning**: GitLeaks
+- **Vulnerability Scanning**: Trivy
 
 ## 🛡️ Security
 
-- Secure secrets management
-- HTTPS webhook endpoints only
-- Sandboxed script execution
-- Environment variables protection
+- Secure secrets management for actions.
+- HTTPS webhook endpoints only.
+- Sandboxed script execution for custom actions.
+- Environment variables protection.
+- Regular scanning for secrets within monitored repositories.
 
 ## 🤝 Contributing
 

@@ -7,6 +7,7 @@ import {
   Refresh as RefreshIcon,
   AutoMode as AutoModeIcon,
   Security as SecurityIcon,
+  Policy as PolicyIcon, // Added PolicyIcon for Secret Detection
   Settings as SettingsIcon // Import SettingsIcon
 } from '@mui/icons-material';
 import AuthContext from '../../contexts/AuthContext';
@@ -16,6 +17,7 @@ const baseNavItems = [
   { path: '/pods', label: 'Pod Status', icon: <MemoryIcon /> },
   { path: '/pipeline-status', label: 'Pipeline Status', icon: <AutoModeIcon /> },
   { path: '/vulnerabilities', label: 'Vulnerabilities', icon: <SecurityIcon /> },
+  { path: '/secret-detection', label: 'Secret Detection', icon: <PolicyIcon /> }, // Added Secret Detection link
 ];
 
 const SideNav = () => {

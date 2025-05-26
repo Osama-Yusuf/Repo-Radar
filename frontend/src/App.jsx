@@ -20,6 +20,7 @@ import PipelineStatus from './pages/PipelineStatus';
 import AuthPage from './pages/AuthPage';
 import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities';
 import SettingsPage from './pages/SettingsPage'; // Import SettingsPage
+import SecretDetectionPage from './pages/SecretDetectionPage'; // Import SecretDetectionPage
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -700,6 +701,23 @@ function App() {
                         showAddProjectButton={false} // Hide add project button
                       />
                       <DeploymentVulnerabilities />
+                    </Box>
+                  </>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/secret-detection" element={
+                <ProtectedRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      <Header
+                        onRefresh={() => {}} // No global refresh, page handles its own data
+                        onAddProject={() => {}} // No add project button on this page
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
+                      />
+                      <SecretDetectionPage />
                     </Box>
                   </>
                 </ProtectedRoute>

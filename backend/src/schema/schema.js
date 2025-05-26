@@ -136,6 +136,23 @@ const image_vulnerabilities = pgTable('image_vulnerabilities', {
     };
 });
 
+// Gitleaks Findings table
+const gitleaks_findings = pgTable('gitleaks_findings', {
+    id: serial('id').primaryKey(),
+    projectId: integer('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    description: text('description').notNull(),
+    secret: text('secret').notNull(),
+    filePath: text('file_path').notNull(),
+    lineNumber: integer('line_number'),
+    commitHash: text('commit_hash').notNull(),
+    author: text('author'),
+    date: timestamp('date'),
+    tags: jsonb('tags'),
+    ruleId: text('rule_id').notNull(),
+    scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+    commitUrl: text('commit_url'),
+});
+
 module.exports = {
     projects,
     branches,
@@ -146,5 +163,6 @@ module.exports = {
     users,
     tracked_images, // Updated export
     image_vulnerabilities, // Updated export
-    app_settings // Export app_settings table
+    app_settings, // Export app_settings table
+    gitleaks_findings // Export gitleaks_findings table
 };

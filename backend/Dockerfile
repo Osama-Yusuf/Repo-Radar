@@ -17,6 +17,18 @@ COPY package.json pnpm-lock.yaml ./
 # Install pnpm globally
 RUN npm install -g pnpm
 
+# Install Gitleaks
+ENV GITLEAKS_VERSION=v8.26.0
+ENV GITLEAKS_ARCH=x64
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
+    wget https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz -O gitleaks.tar.gz && \
+    tar -xzf gitleaks.tar.gz gitleaks && \
+    chmod +x gitleaks && \
+    mv gitleaks /usr/local/bin/gitleaks && \
+    rm gitleaks.tar.gz && \
+    apt-get purge -y --auto-remove wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 RUN pnpm install
 

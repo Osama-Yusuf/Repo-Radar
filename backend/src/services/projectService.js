@@ -8,6 +8,8 @@ const os = require('os');
 const { db } = require('../config/drizzle');
 const { eq, and } = require('drizzle-orm');
 const schema = require('../schema/schema');
+const { scanRepository: gitleaksScan } = require('./gitleaksScanService'); // Added gitleaksScanService
+const { gitleaks_findings, app_settings } = require('../schema/schema'); // Ensure these are available
 
 class ProjectService {
     constructor(dbInstance) {
@@ -15,6 +17,7 @@ class ProjectService {
         this.projectTimers = new Map();
         this.projectCache = new Map();
         this.githubService = null; // Will be initialized in an async method
+        this.githubToken = null; // To store GitHub token for Gitleaks
     }
 
     async initialize() {
@@ -22,14 +25,20 @@ class ProjectService {
             this.githubService = await githubServicePromise;
             if (!this.githubService) {
                 console.error('Failed to initialize GitHubService in ProjectService. GitHub related features will not work.');
-                // Optionally, you could throw an error here to prevent the app from starting
-                // or set a flag to disable GitHub-dependent functionality.
             } else {
                 console.log('GitHubService initialized successfully in ProjectService.');
             }
+
+            // Fetch GitHub token from app_settings
+            const settings = await this.db.select().from(app_settings).limit(1);
+            if (settings && settings.length > 0 && settings[0].github_token) {
+                this.githubToken = settings[0].github_token;
+                console.log('GitHub token loaded for GitLeaks scans.');
+            } else {
+                console.warn('GitHub token not found in app_settings. GitLeaks scans may be limited or fail for private repositories.');
+            }
         } catch (error) {
-            console.error('Error initializing GitHubService in ProjectService:', error);
-            // Handle error appropriately, e.g., by setting this.githubService to null or re-throwing
+            console.error('Error initializing ProjectService (GitHubService or AppSettings):', error);
         }
     }
 
@@ -215,6 +224,8 @@ class ProjectService {
 
         this[lockKey] = true;
         console.log(`Checking project ${project.name}...`);
+        let projectHasChanges = false; // Flag for project-level changes
+        const changedBranchCheckLogIds = []; // Store checkLog IDs of changed branches
 
         try {
             // Get current branches with their SHA
@@ -223,6 +234,7 @@ class ProjectService {
 
             if (!branches || branches.length === 0) {
                 console.log(`No branches found for project ${project.name}`);
+                delete this[lockKey]; // Release lock early
                 return;
             }
 
@@ -234,6 +246,7 @@ class ProjectService {
             }
 
             for (const branch of branches) {
+                let currentCheckLogId = null; // To store the ID of the log for THIS branch check
                 try {
                     const repoUrl = project.repo_url || project.repoUrl;
                     if (!repoUrl) {
@@ -286,6 +299,7 @@ class ProjectService {
                     const hasChanged = branch.lastCommitSha !== latestCommit.sha;
 
                     if (hasChanged) {
+                        projectHasChanges = true; // Mark that the project has changes
                         console.log(`Changes detected in ${project.name}/${branch.branchName}`);
                         console.log(`Old SHA: ${branch.lastCommitSha}`);
                         console.log(`New SHA: ${latestCommit.sha}`);
@@ -303,18 +317,23 @@ class ProjectService {
                         const commitData = latestCommit.commit || {};
                         const commitAuthor = commitData.author || {};
 
-                        // Log the change
-                        await this.db.insert(schema.checkLogs).values({
+                        // Log the change for this specific branch
+                        const checkLogResult = await this.db.insert(schema.checkLogs).values({
                             projectId: project.id,
                             branchName: branch.branchName,
                             commitSha: latestCommit.sha,
                             commitMessage: commitData.message || 'No commit message provided',
                             commitAuthor: commitAuthor.name || 'Unknown',
                             commitDate: commitAuthor.date ? new Date(commitAuthor.date) : new Date(),
-                            status: 'changed'
-                        });
+                            status: 'changed' // Initial status for this branch change
+                        }).returning({ insertedId: schema.checkLogs.id });
+                        
+                        currentCheckLogId = checkLogResult[0]?.insertedId;
+                        if (currentCheckLogId) {
+                            changedBranchCheckLogIds.push(currentCheckLogId);
+                        }
 
-                        // Execute actions for the change
+                        // Execute actions for this specific branch change
                         await this.executeActions(project, branch, latestCommit);
                     } else {
                         console.log(`No changes in ${project.name}/${branch.branchName}`);
@@ -322,21 +341,104 @@ class ProjectService {
                         console.log(`Latest SHA: ${latestCommit.sha}`);
 
                         // Log the check even when no changes
-                        await this.db.insert(schema.checkLogs).values({
-                            projectId: project.id,
-                            branchName: branch.branchName,
-                            commitSha: branch.lastCommitSha,
-                            commitMessage: 'No changes detected',
-                            commitAuthor: 'System',
-                            commitDate: new Date(),
-                            status: 'no_change'
-                        });
+                        // Only log 'no_change' if not already logged by an initial check earlier in the process.
+                        // This part remains unchanged by gitleaks integration.
+                        const existingLog = await this.db.select().from(schema.checkLogs)
+                            .where(and(
+                                eq(schema.checkLogs.projectId, project.id),
+                                eq(schema.checkLogs.branchName, branch.branchName),
+                                eq(schema.checkLogs.commitSha, branch.lastCommitSha)
+                            )).orderBy(schema.checkLogs.checkedAt).limit(1);
+
+                        if (!existingLog.length || existingLog[0].status !== 'no_change') {
+                             await this.db.insert(schema.checkLogs).values({
+                                projectId: project.id,
+                                branchName: branch.branchName,
+                                commitSha: branch.lastCommitSha,
+                                commitMessage: 'No changes detected',
+                                commitAuthor: 'System',
+                                commitDate: new Date(),
+                                status: 'no_change'
+                            });
+                        }
                     }
                 } catch (error) {
                     console.error(`Error checking branch ${branch.branchName}:`, error);
                     await this.logCheckError(project.id, error, branch.branchName);
                 }
             }
+
+            // After checking all branches, if any branch had changes, run project-level GitLeaks scan
+            if (projectHasChanges) {
+                console.log(`[ProjectScan - ${project.id}] Initiating project-level GitLeaks scan for ${project.name} as changes were detected.`);
+                let gitleaksOverallSuccess = true;
+                const allNewFindingsForProject = [];
+
+                if (!this.githubToken) {
+                    console.warn(`[ProjectScan - ${project.id}] No GitHub token available. Scan quality may be impacted for private repo ${project.repo_url || project.repoUrl}.`);
+                }
+
+                try {
+                    // Fetch all monitored branches again for this project
+                    const monitoredBranches = await this.db.select().from(schema.branches).where(eq(schema.branches.projectId, project.id));
+
+                    // Delete all previous findings for this project ID *once*
+                    console.log(`[ProjectScan - ${project.id}] Deleting previous GitLeaks findings for project ${project.name}.`);
+                    await this.db.delete(gitleaks_findings).where(eq(gitleaks_findings.projectId, project.id));
+
+                    for (const monitoredBranch of monitoredBranches) {
+                        console.log(`[ProjectScan - ${project.id}] Scanning branch: ${monitoredBranch.branchName}`);
+                        const scanResult = await gitleaksScan(project.repo_url || project.repoUrl, this.githubToken, monitoredBranch.branchName);
+
+                        if (scanResult.success) {
+                            console.log(`[ProjectScan - ${project.id}] Branch ${monitoredBranch.branchName} scan successful. Findings: ${scanResult.findings?.length || 0}`);
+                            if (scanResult.findings && scanResult.findings.length > 0) {
+                                scanResult.findings.forEach(finding => {
+                                    allNewFindingsForProject.push({
+                                        projectId: project.id,
+                                        description: finding.Description,
+                                        secret: finding.Secret,
+                                        filePath: finding.File,
+                                        lineNumber: finding.StartLine,
+                                        commitHash: finding.Commit,
+                                        author: finding.Author,
+                                        date: finding.Date ? new Date(finding.Date) : null,
+                                        tags: finding.Tags || [],
+                                        ruleId: finding.RuleID,
+                                        commitUrl: finding.CommitURL || null,
+                                    });
+                                });
+                            }
+                        } else {
+                            gitleaksOverallSuccess = false;
+                            console.error(`[ProjectScan - ${project.id}] Branch ${monitoredBranch.branchName} scan FAILED: ${scanResult.error}`);
+                        }
+                    }
+
+                    if (allNewFindingsForProject.length > 0) {
+                        console.log(`[ProjectScan - ${project.id}] Inserting ${allNewFindingsForProject.length} new findings for project ${project.name}.`);
+                        await this.db.insert(gitleaks_findings).values(allNewFindingsForProject);
+                    } else {
+                        console.log(`[ProjectScan - ${project.id}] No new findings across all branches for project ${project.name}.`);
+                    }
+
+                } catch (projectScanError) {
+                    gitleaksOverallSuccess = false;
+                    console.error(`[ProjectScan - ${project.id}] Error during project-level GitLeaks scan or processing for ${project.name}:`, projectScanError);
+                }
+
+                // Update status of checkLogs for branches that had changes
+                const finalProjectScanStatus = gitleaksOverallSuccess ? 'changed_gitleaks_project_success' : 'changed_gitleaks_project_failed';
+                if (changedBranchCheckLogIds.length > 0) {
+                    console.log(`[ProjectScan - ${project.id}] Updating status to ${finalProjectScanStatus} for checkLogs: ${changedBranchCheckLogIds.join(', ')}`);
+                    for (const logId of changedBranchCheckLogIds) {
+                        await this.db.update(schema.checkLogs)
+                            .set({ status: finalProjectScanStatus })
+                            .where(eq(schema.checkLogs.id, logId));
+                    }
+                }
+            }
+
         } catch (error) {
             console.error(`Error in checkProjectChanges for ${project.name}:`, error);
             await this.logCheckError(project.id, error);

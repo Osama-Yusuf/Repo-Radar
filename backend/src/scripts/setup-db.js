@@ -128,6 +128,24 @@ async function setupDatabase() {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Create gitleaks_findings table
+      CREATE TABLE IF NOT EXISTS gitleaks_findings (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        line_number INTEGER,
+        commit_hash TEXT NOT NULL,
+        author TEXT,
+        date TIMESTAMP,
+        tags JSONB,
+        rule_id TEXT NOT NULL,
+        scanned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        commit_url TEXT,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
       -- Create indexes for image_vulnerabilities table
       CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_tracked_image_id ON image_vulnerabilities(tracked_image_id);
       CREATE INDEX IF NOT EXISTS idx_image_vulnerabilities_vulnerability_cve_id ON image_vulnerabilities(vulnerability_cve_id);

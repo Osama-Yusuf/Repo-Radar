@@ -1,4 +1,4 @@
-const { eq, desc, and } = require('drizzle-orm');
+const { eq, desc, and, asc } = require('drizzle-orm'); // Added asc
 const schema = require('../schema/schema');
 
 class ProjectController {
@@ -624,6 +624,29 @@ class ProjectController {
         } catch (error) {
             console.error('Error importing projects:', error);
             res.status(500).json({ error: 'Failed to import projects' });
+        }
+    }
+
+    async getProjectSecretFindings(req, res) {
+        const { projectId } = req.params;
+
+        try {
+            const findings = await this.db.select()
+                .from(schema.gitleaks_findings)
+                .where(eq(schema.gitleaks_findings.projectId, parseInt(projectId)))
+                .orderBy(asc(schema.gitleaks_findings.filePath), asc(schema.gitleaks_findings.lineNumber));
+
+            if (!findings) {
+                // This case might not be strictly necessary if an empty array is acceptable for no findings.
+                // However, if .select() could return null/undefined in some scenarios (e.g. DB error before query execution),
+                // it could be useful. Drizzle typically returns [] for no rows found.
+                return res.status(404).json({ error: 'No findings found for this project or project does not exist.' });
+            }
+            
+            res.json(findings);
+        } catch (err) {
+            console.error(`Error fetching secret findings for project ${projectId}:`, err);
+            res.status(500).json({ error: `Failed to fetch secret findings: ${err.message}` });
         }
     }
 }
