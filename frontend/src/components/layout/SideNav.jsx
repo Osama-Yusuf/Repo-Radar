@@ -22,12 +22,10 @@ const SideNav = () => {
   const location = useLocation();
   const { currentUser } = useContext(AuthContext); // Get currentUser from AuthContext
 
-  const navItems = [
-    ...baseNavItems,
-    ...(currentUser && currentUser.role === 'admin'
-      ? [{ path: '/settings', label: 'Settings', icon: <SettingsIcon /> }]
-      : []),
-  ];
+  // Create a separate settings item
+  const settingsItem = currentUser && currentUser.role === 'admin'
+    ? { path: '/settings', label: 'Settings', icon: <SettingsIcon /> }
+    : null;
 
   return (
     <Paper
@@ -46,8 +44,9 @@ const SideNav = () => {
         top: 0,
       }}
     >
-      <List>
-        {navItems.map(({ path, label, icon }) => (
+      {/* Main navigation items at the top */}
+      <List sx={{ flexGrow: 0 }}>
+        {baseNavItems.map(({ path, label, icon }) => (
           <Tooltip key={path} title={label} placement="right" arrow>
             <ListItem
               component={Link}
@@ -72,6 +71,36 @@ const SideNav = () => {
           </Tooltip>
         ))}
       </List>
+
+      {/* Spacer to push settings to bottom */}
+      <Box sx={{ flexGrow: 1 }} />
+
+      {/* Settings button fixed at the bottom */}
+      {settingsItem && (
+        <Box sx={{ mb: 3 }}>
+          <Tooltip title={settingsItem.label} placement="right" arrow>
+            <ListItem
+              component={Link}
+              to={settingsItem.path}
+              sx={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '12px',
+                display: 'flex',
+                justifyContent: 'center',
+                color: location.pathname === settingsItem.path ? '#2196f3' : 'rgba(255, 255, 255, 0.7)',
+                background: location.pathname === settingsItem.path ? 'rgba(33, 150, 243, 0.1)' : 'transparent',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: location.pathname === settingsItem.path ? '#2196f3' : '#fff',
+                }
+              }}
+            >
+              <Box sx={{ transform: 'scale(1.2)' }}>{settingsItem.icon}</Box>
+            </ListItem>
+          </Tooltip>
+        </Box>
+      )}
     </Paper>
   );
 };
