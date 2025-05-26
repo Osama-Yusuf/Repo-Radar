@@ -514,10 +514,30 @@ const AppStatusPage = () => {
         </Card>
       )}
       {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>{isEditing ? 'Edit Custom Endpoint' : 'Add Custom Endpoint'}</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(26, 32, 53, 0.95)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 2,
+            color: 'white',
+            minWidth: '500px'
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          py: 2,
+          color: '#fff',
+          fontWeight: 'medium'
+        }}>
+          {isEditing ? 'Edit Custom Endpoint' : 'Add Custom Endpoint'}
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <DialogContentText sx={{ mb: 3, color: '#90CAF9' }}>
             {isEditing ? 'Update the details of your custom monitored endpoint.' : 'Enter the details for the new custom endpoint you want to monitor.'}
           </DialogContentText>
           <TextField
@@ -530,7 +550,26 @@ const AppStatusPage = () => {
             variant="outlined"
             value={currentEndpointData.name}
             onChange={handleDialogInputChange}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90CAF9',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
+              },
+              '& .MuiInputBase-input': {
+                color: 'white',
+              }
+            }}
           />
           <TextField
             margin="dense"
@@ -541,7 +580,26 @@ const AppStatusPage = () => {
             variant="outlined"
             value={currentEndpointData.url}
             onChange={handleDialogInputChange}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90CAF9',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
+              },
+              '& .MuiInputBase-input': {
+                color: 'white',
+              }
+            }}
           />
           <TextField
             margin="dense"
@@ -553,11 +611,56 @@ const AppStatusPage = () => {
             value={currentEndpointData.check_interval_seconds}
             onChange={handleDialogInputChange}
             inputProps={{ min: 15 }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90CAF9',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
+              },
+              '& .MuiInputBase-input': {
+                color: 'white',
+              }
+            }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveEndpoint} variant="contained">Save</Button>
+        <DialogActions sx={{
+          px: 3,
+          py: 2,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <Button
+            onClick={handleCloseDialog}
+            sx={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              '&:hover': {
+                color: 'white',
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEndpoint}
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5c0fb1 0%, #1e68e3 100%)',
+              }
+            }}
+          >
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -565,16 +668,66 @@ const AppStatusPage = () => {
       <Dialog
         open={showDeleteConfirm.open}
         onClose={handleCloseDeleteConfirm}
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(26, 32, 53, 0.95)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 2,
+            color: 'white',
+            minWidth: '400px'
+          }
+        }}
       >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the endpoint "{showDeleteConfirm.endpointName}"? This action cannot be undone.
+        <DialogTitle sx={{
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          py: 2,
+          color: '#fff',
+          fontWeight: 'medium'
+        }}>
+          Confirm Delete
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <DeleteIcon sx={{ color: '#f44336', mr: 2, fontSize: 28 }} />
+            <DialogContentText sx={{ color: 'white', m: 0 }}>
+              Are you sure you want to delete the endpoint "<span style={{ color: '#f44336', fontWeight: 'bold' }}>{showDeleteConfirm.endpointName}</span>"?
+            </DialogContentText>
+          </Box>
+          <DialogContentText sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 2 }}>
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteConfirm}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">Delete</Button>
+        <DialogActions sx={{
+          px: 3,
+          py: 2,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <Button
+            onClick={handleCloseDeleteConfirm}
+            sx={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              '&:hover': {
+                color: 'white',
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            sx={{
+              bgcolor: 'rgba(244, 67, 54, 0.8)',
+              '&:hover': {
+                bgcolor: 'rgba(244, 67, 54, 1)',
+              }
+            }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>
