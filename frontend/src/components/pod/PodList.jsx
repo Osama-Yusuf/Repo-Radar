@@ -32,9 +32,7 @@ const PodList = ({
         mb: 6,
         gap: 2
       }}>
-        <Typography variant="h5" sx={{ color: '#fff', fontWeight: 500 }}>
-          Pod Status
-        </Typography>
+
 
         <Box sx={{
           display: 'flex',

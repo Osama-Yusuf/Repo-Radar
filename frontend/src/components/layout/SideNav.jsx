@@ -1,3 +1,4 @@
+import React, { useContext } from 'react'; // Import useContext
 import { Box, List, ListItem, ListItemIcon, ListItemText, Paper, Tooltip } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -5,18 +6,28 @@ import {
   Memory as MemoryIcon,
   Refresh as RefreshIcon,
   AutoMode as AutoModeIcon,
-  Security as SecurityIcon // Import the SecurityIcon
+  Security as SecurityIcon,
+  Settings as SettingsIcon // Import SettingsIcon
 } from '@mui/icons-material';
+import AuthContext from '../../contexts/AuthContext';
 
-const navItems = [
+const baseNavItems = [
   { path: '/', label: 'Repositories', icon: <SourceIcon /> },
   { path: '/pods', label: 'Pod Status', icon: <MemoryIcon /> },
   { path: '/pipeline-status', label: 'Pipeline Status', icon: <AutoModeIcon /> },
-  { path: '/vulnerabilities', label: 'Vulnerabilities', icon: <SecurityIcon /> }, // Add new nav item
+  { path: '/vulnerabilities', label: 'Vulnerabilities', icon: <SecurityIcon /> },
 ];
 
 const SideNav = () => {
   const location = useLocation();
+  const { currentUser } = useContext(AuthContext); // Get currentUser from AuthContext
+
+  const navItems = [
+    ...baseNavItems,
+    ...(currentUser && currentUser.role === 'admin'
+      ? [{ path: '/settings', label: 'Settings', icon: <SettingsIcon /> }]
+      : []),
+  ];
 
   return (
     <Paper

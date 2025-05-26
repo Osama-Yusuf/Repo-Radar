@@ -5,7 +5,7 @@ const { sql } = require('drizzle-orm');
 async function setupDatabase() {
   try {
     console.log('Setting up database using Drizzle...');
-    
+
     // Create tables in the correct order to handle foreign key relationships
     const createTables = sql`
       -- Create projects table
@@ -81,8 +81,20 @@ async function setupDatabase() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) NOT NULL UNIQUE,
         password TEXT NOT NULL,
+        role VARCHAR(10) NOT NULL DEFAULT 'user',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Create app_settings table
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id SERIAL PRIMARY KEY,
+        github_api_url TEXT,
+        github_token TEXT,
+        kubernetes_namespaces JSONB DEFAULT '[]',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT app_settings_single_row CHECK (id = 1)
       );
 
       -- Create tracked_images table
@@ -91,6 +103,8 @@ async function setupDatabase() {
         image_name TEXT NOT NULL,
         image_tag TEXT NOT NULL,
         image_digest TEXT,
+        namespace TEXT,
+        last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         last_scanned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         scan_status TEXT NOT NULL,
         raw_trivy_output JSONB,

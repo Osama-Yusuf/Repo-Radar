@@ -5,6 +5,8 @@ const util = require('util');
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
+const { getTargetNamespace } = require('../config/k8s-client'); // Import getTargetNamespace
+
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const appsV1Api = kc.makeApiClient(k8s.AppsV1Api); // Import AppsV1Api
 const metricsApi = kc.makeApiClient(k8s.CustomObjectsApi);
@@ -24,17 +26,17 @@ function formatAge(timestamp) {
 // Helper functions to convert metrics units
 function convertCpuToMillicores(cpuString) {
   if (!cpuString) return '0m';
-  
+
   // If already in millicores format, return as is
   if (cpuString.endsWith('m')) return cpuString;
-  
+
   // Convert from nanocores (n) to millicores (m)
   if (cpuString.endsWith('n')) {
     const nanocores = parseInt(cpuString.replace('n', ''), 10);
     const millicores = Math.round(nanocores / 1000000); // 1m = 1,000,000n
     return `${millicores}m`;
   }
-  
+
   // Handle core value (no suffix)
   const cores = parseFloat(cpuString);
   return `${Math.round(cores * 1000)}m`;
@@ -42,45 +44,45 @@ function convertCpuToMillicores(cpuString) {
 
 function convertMemoryToMi(memString) {
   if (!memString) return '0Mi';
-  
+
   // If already in Mi format, return as is
   if (memString.endsWith('Mi')) return memString;
-  
+
   // Convert from Ki to Mi
   if (memString.endsWith('Ki')) {
     const ki = parseInt(memString.replace('Ki', ''), 10);
     const mi = Math.round(ki / 1024);
     return `${mi}Mi`;
   }
-  
+
   // Handle other formats
   if (memString.endsWith('Gi')) {
     const gi = parseFloat(memString.replace('Gi', ''));
     return `${Math.round(gi * 1024)}Mi`;
   }
-  
+
   // Default case - assume bytes and convert to Mi
   const bytes = parseInt(memString, 10);
   const mi = Math.round(bytes / (1024 * 1024));
   return `${mi}Mi`;
 }
 
-async function getPodMetrics() {
+async function getPodMetrics(namespace) { // Accept namespace as a parameter
   try {
     const metrics = new Map();
     const metricsResponse = await metricsApi.getNamespacedCustomObject(
       'metrics.k8s.io',
       'v1beta1',
-      'default',
+      namespace, // Use the provided namespace
       'pods',
       ''
     );
-    
+
     if (metricsResponse.body && metricsResponse.body.items) {
       metricsResponse.body.items.forEach(podMetric => {
         const podName = podMetric.metadata.name;
         const containers = {};
-        
+
         if (podMetric.containers) {
           podMetric.containers.forEach(container => {
             containers[container.name] = {
@@ -89,11 +91,11 @@ async function getPodMetrics() {
             };
           });
         }
-        
+
         metrics.set(podName, containers);
       });
     }
-    
+
     return metrics;
   } catch (error) {
     console.error('Error getting pod metrics:', error);
@@ -101,11 +103,16 @@ async function getPodMetrics() {
   }
 }
 
-// Get pod status in default namespace
+// Get pod status in the target namespace
 router.get('/pods', async (req, res) => {
   try {
-    const response = await k8sApi.listNamespacedPod('default');
-    const podMetrics = await getPodMetrics();
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+
+    console.log(`Fetching pods for namespace: ${namespaceToUse}`);
+
+    const response = await k8sApi.listNamespacedPod(namespaceToUse);
+    const podMetrics = await getPodMetrics(namespaceToUse);
 
     const pods = response.body.items.map(pod => {
       const metrics = podMetrics.get(pod.metadata.name) || {};
@@ -155,7 +162,12 @@ router.get('/pods', async (req, res) => {
 // Get deployments with image information
 router.get('/deployments-with-images', async (req, res) => {
   try {
-    const response = await appsV1Api.listNamespacedDeployment('default');
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+
+    // console.log(`Fetching deployments for namespace: ${namespaceToUse}`);
+
+    const response = await appsV1Api.listNamespacedDeployment(namespaceToUse);
     const deployments = response.body.items.map(deployment => {
       const firstContainer = deployment.spec.template.spec.containers?.[0];
       const imageName = firstContainer?.image || null;
@@ -178,9 +190,14 @@ router.get('/deployments-with-images', async (req, res) => {
 // Get logs for a specific pod
 router.get('/pods/:name/logs', async (req, res) => {
   try {
+    const requestedNamespace = req.query.namespace;
+    const namespaceToUse = requestedNamespace || await getTargetNamespace();
+
+    console.log(`Fetching logs for pod ${req.params.name} in namespace: ${namespaceToUse}`);
+
     const response = await k8sApi.readNamespacedPodLog(
       req.params.name,
-      'default',
+      namespaceToUse,
       undefined,
       false,
       undefined,
@@ -190,7 +207,7 @@ router.get('/pods/:name/logs', async (req, res) => {
       undefined,
       1000 // Limit to last 1000 lines
     );
-    
+
     // Handle the response correctly - it's already a string
     res.json({ logs: response.body || 'No logs available' });
   } catch (error) {

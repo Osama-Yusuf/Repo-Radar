@@ -14,6 +14,7 @@ const AuthController = require('./src/controllers/authController');
 const setupProjectRoutes = require('./src/routes/projectRoutes');
 const setupActionRoutes = require('./src/routes/actionRoutes');
 const setupAuthRoutes = require('./src/routes/authRoutes');
+const settingsRoutes = require('./src/routes/settingsRoutes'); // Import settings routes
 const k8sRoutes = require('./src/routes/k8s');
 const tektonRoutes = require('./src/routes/tekton');
 const vulnerabilityRoutes = require('./src/routes/vulnerabilities');
@@ -35,6 +36,7 @@ async function initializeApp() {
 
         // Initialize services with database instance
         const projectService = new ProjectService(db);
+        await projectService.initialize(); // Initialize ProjectService (which includes GitHubService)
         console.log('Project service initialized');
 
         // Initialize controllers with database instance
@@ -53,6 +55,7 @@ async function initializeApp() {
         app.use('/api/projects', projectRouter);
         app.use('/api', actionRouter);
         app.use('/api/auth', authRouter);
+        app.use('/api/settings', settingsRoutes); // Use settings routes
         app.use('/api/k8s', k8sRoutes);
         app.use('/api/tekton', tektonRoutes);
         app.use('/api/vulnerabilities', vulnerabilityRoutes); // Mount vulnerability routes
@@ -67,7 +70,7 @@ async function initializeApp() {
 
         // Start Kubernetes Image Monitoring
         if (startK8sImageMonitoring) { // Check if the import was successful / function exists
-            startK8sImageMonitoring(); // No need to await if it's a background polling service
+            await startK8sImageMonitoring(); // Await the async function
             console.log('Kubernetes image monitoring service started.');
         } else {
             console.warn('Kubernetes image monitoring service could not be started (startMonitoring function not found).');

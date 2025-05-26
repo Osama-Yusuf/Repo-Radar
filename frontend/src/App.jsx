@@ -12,12 +12,14 @@ import ProjectDialog from './components/projects/ProjectDialog';
 import ActionDialog from './components/actions/ActionDialog';
 import LogsDialog from './components/logs/LogsDialog';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AdminRoute from './components/auth/AdminRoute'; // Import AdminRoute
 
 // Pages
 import PodStatus from './pages/PodStatus';
 import PipelineStatus from './pages/PipelineStatus';
 import AuthPage from './pages/AuthPage';
-import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities'; // Import the new page
+import DeploymentVulnerabilities from './pages/DeploymentVulnerabilities';
+import SettingsPage from './pages/SettingsPage'; // Import SettingsPage
 
 // Context
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -661,6 +663,7 @@ function App() {
                         onRefresh={() => fetchProjects(true)}
                         onAddProject={() => handleOpenDialog()}
                         isRefreshing={refreshing}
+                        showAddProjectButton={false}
                       />
                       <PodStatus />
                     </Box>
@@ -677,6 +680,7 @@ function App() {
                         onRefresh={() => fetchProjects(true)}
                         onAddProject={() => handleOpenDialog()}
                         isRefreshing={refreshing}
+                        showAddProjectButton={false}
                       />
                       <PipelineStatus />
                     </Box>
@@ -684,20 +688,39 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              <Route path="/vulnerabilities" element={ // Add new route for vulnerabilities
+              <Route path="/vulnerabilities" element={
                 <ProtectedRoute>
                   <>
                     <SideNav />
                     <Box sx={{ flex: 1, ml: '80px' }}>
                       <Header
-                        onRefresh={() => fetchProjects(true)} // Or a relevant refresh function
-                        onAddProject={() => handleOpenDialog()} // Or relevant action
-                        isRefreshing={refreshing} // Or relevant state
+                        onRefresh={() => { }} // No global refresh, settings page handles its own data
+                        onAddProject={() => { }} // No add project button on settings
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
                       />
                       <DeploymentVulnerabilities />
                     </Box>
                   </>
                 </ProtectedRoute>
+              } />
+
+              <Route path="/settings" element={
+                <AdminRoute>
+                  <>
+                    <SideNav />
+                    <Box sx={{ flex: 1, ml: '80px' }}>
+                      {/* Minimal Header for settings, or customize as needed */}
+                      <Header
+                        onRefresh={() => { }} // No global refresh, settings page handles its own data
+                        onAddProject={() => { }} // No add project button on settings
+                        isRefreshing={false}
+                        showAddProjectButton={false} // Hide add project button
+                      />
+                      <SettingsPage />
+                    </Box>
+                  </>
+                </AdminRoute>
               } />
 
               <Route path="*" element={<Navigate to="/" replace />} />

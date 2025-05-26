@@ -23,17 +23,19 @@ const verifyToken = async (req, res, next) => {
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
-            // Find user in database to ensure they still exist
+            // Find user in database to ensure they still exist and get their current role
             const user = await db.select().from(users).where(eq(users.id, decoded.id));
 
             if (user.length === 0) {
-                return res.status(401).json({ error: 'Invalid token. User not found' });
+                return res.status(401).json({ error: 'User no longer exists' });
             }
 
-            // Attach user info to request
+            // Always use the current user data from the database, not from the token
+            // This ensures we have the most up-to-date role information
             req.user = {
-                id: decoded.id,
-                username: decoded.username
+                id: user[0].id,
+                username: user[0].username,
+                role: user[0].role // This will always be the current role from the database
             };
 
             next();
@@ -47,5 +49,12 @@ const verifyToken = async (req, res, next) => {
 };
 
 module.exports = {
-    verifyToken
+    verifyToken,
+    isAdmin: (req, res, next) => {
+        if (req.user && req.user.role === 'admin') {
+            next();
+        } else {
+            res.status(403).json({ error: 'Forbidden. Administrator access required.' });
+        }
+    }
 };
