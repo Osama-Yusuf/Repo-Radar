@@ -3,6 +3,8 @@ import axios from 'axios';
 import { Container, Typography, CircularProgress, Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material'; // Added FormControl, InputLabel, Select, MenuItem
 import DeploymentVulnerabilityCard from '../components/vulnerabilities/DeploymentVulnerabilityCard';
 import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
+import { useSearch } from '../contexts/SearchContext'; // Import useSearch hook
+import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
 
 // Corrected API_BASE_URL definition using Vite environment variables
 const PORT = import.meta.env.VITE_PORT || '3001';
@@ -27,9 +29,11 @@ const DeploymentVulnerabilities = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { token } = useContext(AuthContext); // Get token
+  const { searchQuery } = useSearch(); // Get search query from context
 
   const [availableNamespaces, setAvailableNamespaces] = useState([]);
   const [selectedNamespace, setSelectedNamespace] = useState('');
+  const [filteredDeployments, setFilteredDeployments] = useState([]);
 
   // Add Authorization header interceptor for apiClient
   useEffect(() => {
@@ -93,6 +97,28 @@ const DeploymentVulnerabilities = () => {
       // No interval refresh for deployments for now, can be added if needed
     }
   }, [selectedNamespace, token]);
+
+  // Filter deployments based on search query
+  useEffect(() => {
+    if (!deployments.length) {
+      setFilteredDeployments([]);
+      return;
+    }
+
+    if (!searchQuery) {
+      setFilteredDeployments(deployments);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = deployments.filter(deployment =>
+      deployment.deploymentName.toLowerCase().includes(query) ||
+      deployment.namespace.toLowerCase().includes(query) ||
+      (deployment.imageName && deployment.imageName.toLowerCase().includes(query))
+    );
+
+    setFilteredDeployments(filtered);
+  }, [searchQuery, deployments]);
 
   // Always show loading when switching namespaces, even if deployments are already loaded
   if (loading) {
@@ -182,12 +208,48 @@ const DeploymentVulnerabilities = () => {
         )}
       </Box>
       {loading && <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 2, mb: 2 }} />}
-      {!loading && deployments.length === 0 && (
-        <Typography sx={{ textAlign: 'center', mt: 5 }}>
-          No deployments found in namespace: {selectedNamespace || 'N/A'}.
-        </Typography>
+      {!loading && filteredDeployments.length === 0 && (
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 6,
+          px: 3,
+          mt: 2,
+          borderRadius: 2,
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.05)'
+        }}>
+          <Box sx={{
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+            border: '1px solid rgba(33, 150, 243, 0.2)',
+            mb: 2
+          }}>
+            <SearchIcon sx={{ fontSize: 28, color: '#90caf9' }} />
+          </Box>
+          <Typography variant="h6" sx={{ color: '#fff', mb: 1 }}>
+            No Deployments Found
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', textAlign: 'center', maxWidth: 600 }}>
+            {searchQuery
+              ? `We couldn't find any deployments matching "${searchQuery}" in the namespace "${selectedNamespace || 'N/A'}".`
+              : `There are no deployments currently available in the namespace "${selectedNamespace || 'N/A'}".`}
+          </Typography>
+          {searchQuery && (
+            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)', mt: 1, textAlign: 'center' }}>
+              Try adjusting your search term or selecting a different namespace.
+            </Typography>
+          )}
+        </Box>
       )}
-      {deployments.map((deployment) => (
+      {filteredDeployments.map((deployment) => (
         <DeploymentVulnerabilityCard
           key={`${deployment.namespace}-${deployment.deploymentName}`}
           deployment={deployment}
