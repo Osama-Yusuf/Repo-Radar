@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
     Tabs, Tab, TextField, Button, Paper, Typography, Box, CircularProgress, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem, FormControl, InputLabel,
-    useTheme, alpha, Divider
+    useTheme, alpha, Divider, Card, CardContent, Grid
 } from '@mui/material';
+import { FileUpload as ImportIcon, FileDownload as ExportIcon, Upload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
 import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
 const PORT = import.meta.env.VITE_PORT || '3001';
@@ -34,6 +35,7 @@ const SettingsPage = () => {
     const theme = useTheme();
     const [tabValue, setTabValue] = useState(0);
     const { currentUser, token } = useContext(AuthContext); // Get currentUser role and token
+    const fileInputRef = useRef(null);
 
     // General Settings State
     const [generalSettings, setGeneralSettings] = useState({
@@ -62,6 +64,11 @@ const SettingsPage = () => {
 
     const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user' });
     const [editUserRole, setEditUserRole] = useState('user');
+
+    // Data Management State
+    const [dataManagementSuccess, setDataManagementSuccess] = useState('');
+    const [dataManagementError, setDataManagementError] = useState('');
+    const [loadingDataOperation, setLoadingDataOperation] = useState(false);
 
     // Create axios config with token from AuthContext
     const axiosConfig = useMemo(() => ({
@@ -113,10 +120,13 @@ const SettingsPage = () => {
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
-        setGeneralSettingsError('');
+        // Reset success/error messages when changing tabs
         setGeneralSettingsSuccess('');
-        setUsersError('');
+        setGeneralSettingsError('');
         setUsersSuccess('');
+        setUsersError('');
+        setDataManagementSuccess('');
+        setDataManagementError('');
     };
 
     const handleGeneralSettingsChange = (event) => {
@@ -229,6 +239,58 @@ const SettingsPage = () => {
             });
     };
 
+    // Handle Export Projects
+    const handleExportProjects = async () => {
+        setLoadingDataOperation(true);
+        setDataManagementSuccess('');
+        setDataManagementError('');
+
+        try {
+            const response = await axios.get(`${API_BASE_URL}/projects/export/all`, axiosConfig);
+            const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'repo-radar-projects.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            setDataManagementSuccess('Projects exported successfully!');
+        } catch (error) {
+            console.error('Error exporting projects:', error);
+            setDataManagementError(error.response?.data?.error || 'Failed to export projects.');
+        } finally {
+            setLoadingDataOperation(false);
+        }
+    };
+
+    // Handle Import Projects
+    const handleImportProjects = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setLoadingDataOperation(true);
+        setDataManagementSuccess('');
+        setDataManagementError('');
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const projects = JSON.parse(e.target.result);
+                await axios.post(`${API_BASE_URL}/projects/import`, projects, axiosConfig);
+                setDataManagementSuccess('Projects imported successfully!');
+            } catch (error) {
+                console.error('Error importing projects:', error);
+                setDataManagementError(error.response?.data?.error || 'Failed to import projects. Make sure the file format is correct.');
+            } finally {
+                setLoadingDataOperation(false);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = null; // Reset input
+    };
 
     if (currentUser?.role !== 'admin') {
         return (
@@ -399,7 +461,12 @@ const SettingsPage = () => {
                     }}
                 >
                     <Tab label="General Settings" id="settings-tab-0" aria-controls="settings-tabpanel-0" />
-                    <Tab label="User Management" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
+                    {currentUser?.role === 'admin' && (
+                        <Tab label="User Management" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
+                    )}
+                    {currentUser?.role === 'admin' && (
+                        <Tab label="Data Management" id="settings-tab-2" aria-controls="settings-tabpanel-2" />
+                    )}
                 </Tabs>
             </Box>
 
@@ -652,6 +719,152 @@ const SettingsPage = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+            </TabPanel>
+
+            {/* Data Management Tab */}
+            <TabPanel value={tabValue} index={2}>
+                {currentUser?.role === 'admin' ? (
+                    <Box sx={{ p: 2 }}>
+                        <Typography variant="h5" sx={{ mb: 3, color: '#2196f3' }}>
+                            Data Management
+                        </Typography>
+                        <Typography variant="body1" sx={{ mb: 4, color: 'rgba(255, 255, 255, 0.7)' }}>
+                            Import and export project data for backup or migration purposes.
+                        </Typography>
+
+                        {dataManagementSuccess && (
+                            <Alert
+                                severity="success"
+                                sx={{
+                                    mb: 3,
+                                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                                    color: '#81c784',
+                                    border: '1px solid rgba(46, 125, 50, 0.2)'
+                                }}
+                            >
+                                {dataManagementSuccess}
+                            </Alert>
+                        )}
+
+                        {dataManagementError && (
+                            <Alert
+                                severity="error"
+                                sx={{
+                                    mb: 3,
+                                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                                    color: '#e57373',
+                                    border: '1px solid rgba(211, 47, 47, 0.2)'
+                                }}
+                            >
+                                {dataManagementError}
+                            </Alert>
+                        )}
+
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{
+                                    height: '100%',
+                                    minHeight: 250,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                    borderRadius: 2,
+                                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                                }}>
+                                    <CardContent sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        height: '100%',
+                                        p: 3
+                                    }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <UploadIcon sx={{ mr: 1, color: '#2196f3' }} />
+                                            <Typography variant="h6" sx={{ color: 'white' }}>Import Projects</Typography>
+                                        </Box>
+                                        <Typography variant="body2" sx={{ mb: 3, color: 'rgba(255, 255, 255, 0.7)' }}>
+                                            Import projects from a JSON file. This will add new projects to your existing ones.
+                                        </Typography>
+                                        <Box sx={{ mt: 'auto', py: 7 }}>
+                                            <input
+                                                type="file"
+                                                accept=".json"
+                                                style={{ display: 'none' }}
+                                                onChange={handleImportProjects}
+                                                ref={fileInputRef}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<ImportIcon />}
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={loadingDataOperation}
+                                                sx={{
+                                                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                                    color: '#fff',
+                                                    border: '1px solid rgba(33, 150, 243, 0.3)',
+                                                    padding: '15px 20px',
+                                                    '&:hover': {
+                                                        backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                                                    }
+                                                }}
+                                            >
+                                                {loadingDataOperation ? 'Importing...' : 'Import Projects'}
+                                            </Button>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{
+                                    height: '100%',
+                                    minHeight: 200,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                    borderRadius: 2,
+                                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                                }}>
+                                    <CardContent sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        height: '100%',
+                                        p: 3
+                                    }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <DownloadIcon sx={{ mr: 1, color: '#2196f3' }} />
+                                            <Typography variant="h6" sx={{ color: 'white' }}>Export Projects</Typography>
+                                        </Box>
+                                        <Typography variant="body2" sx={{ mb: 3, color: 'rgba(255, 255, 255, 0.7)' }}>
+                                            Export all projects to a JSON file for backup or migration purposes.
+                                        </Typography>
+                                        <Box sx={{ mt: 'auto', py: 7 }}>
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<ExportIcon />}
+                                                onClick={handleExportProjects}
+                                                disabled={loadingDataOperation}
+                                                sx={{
+                                                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                                    color: '#fff',
+                                                    border: '1px solid rgba(33, 150, 243, 0.3)',
+                                                    padding: '15px 20px',
+                                                    '&:hover': {
+                                                        backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                                                    }
+                                                }}
+                                            >
+                                                {loadingDataOperation ? 'Exporting...' : 'Export Projects'}
+                                            </Button>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                ) : (
+                    <Box sx={{ p: 3, textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                            You don't have permission to access this section.
+                        </Typography>
+                    </Box>
+                )}
             </TabPanel>
 
             {/* Create User Dialog */}
