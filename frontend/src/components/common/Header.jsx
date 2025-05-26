@@ -114,29 +114,34 @@ const Header = ({ onRefresh, onAddProject, isRefreshing }) => {
             ref={input => setImportInput(input)}
           />
 
-          <Tooltip title="Import Projects">
-            <IconButton
-              onClick={() => importInput?.click()}
-              sx={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                '&:hover': { color: '#fff' }
-              }}
-            >
-              <ExportIcon />
-            </IconButton>
-          </Tooltip>
+          {/* Only show import/export buttons for admin users */}
+          {currentUser && currentUser.role === 'admin' && (
+            <>
+              <Tooltip title="Import Projects">
+                <IconButton
+                  onClick={() => importInput?.click()}
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&:hover': { color: '#fff' }
+                  }}
+                >
+                  <ExportIcon />
+                </IconButton>
+              </Tooltip>
 
-          <Tooltip title="Export Projects">
-            <IconButton
-              onClick={handleExport}
-              sx={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                '&:hover': { color: '#fff' }
-              }}
-            >
-              <ImportIcon />
-            </IconButton>
-          </Tooltip>
+              <Tooltip title="Export Projects">
+                <IconButton
+                  onClick={handleExport}
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&:hover': { color: '#fff' }
+                  }}
+                >
+                  <ImportIcon />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
 
           <Button
             variant="contained"
