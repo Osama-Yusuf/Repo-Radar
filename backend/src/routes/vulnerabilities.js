@@ -19,7 +19,7 @@ router.get('/scan/:imageName', async (req, res) => {
             return res.status(400).json({ message: 'Image name is required' });
         }
 
-        console.log(`Fetching vulnerabilities for image: ${imageName}`);
+        // console.log(`Fetching vulnerabilities for image: ${imageName}`);
 
         // Parse image name and tag
         let name = imageName;
@@ -32,7 +32,7 @@ router.get('/scan/:imageName', async (req, res) => {
             tag = parts[1];
         }
 
-        console.log(`Parsed image name: ${name}, tag: ${tag}`);
+        // console.log(`Parsed image name: ${name}, tag: ${tag}`);
 
         // Find the tracked image in the database
         const trackedImage = await db.select()
@@ -55,17 +55,52 @@ router.get('/scan/:imageName', async (req, res) => {
                     tag: tag,
                     digest: null,
                     podName: 'on-demand-scan',
-                    containerName: 'on-demand-scan'
+                    containerName: 'on-demand-scan',
+                    namespace: 'on-demand' // Add namespace information
                 };
 
                 // Process the image (this will add it to the database and queue it for scanning)
                 await processDiscoveredImage(discoveryObject);
 
+                // Get the newly added image to get its ID
+                const newImage = await db.select()
+                    .from(tracked_images)
+                    .where(and(
+                        eq(tracked_images.image_name, name),
+                        eq(tracked_images.image_tag, tag)
+                    ))
+                    .orderBy(desc(tracked_images.id))
+                    .limit(1)
+                    .execute();
+
+                if (newImage && newImage.length > 0) {
+                    // Import the scanImage function directly here to avoid circular dependencies
+                    const { scanImage } = require('../services/trivyScanService');
+
+                    // Trigger an immediate scan
+                    console.log(`Immediately scanning newly added image ${name}:${tag}`);
+
+                    // Update status to scanning
+                    await db.update(tracked_images)
+                        .set({
+                            scan_status: 'scanning',
+                            updated_at: new Date()
+                        })
+                        .where(eq(tracked_images.id, newImage[0].id))
+                        .execute();
+
+                    // Start the scan in the background without waiting for it to complete
+                    // Pass the actual image name and tag instead of just the ID
+                    scanImage(name, tag, newImage[0].image_digest).catch(err => {
+                        console.error(`Background scan for ${name}:${tag} failed:`, err);
+                    });
+                }
+
                 // Return a response indicating the scan has been triggered
                 return res.status(202).json({
                     message: `Image ${imageName} has been queued for scanning. Please check back in a few minutes.`,
                     imageDetails: { name, tag },
-                    status: 'pending'
+                    status: 'scanning'
                 });
             } catch (scanError) {
                 console.error(`Error triggering scan for ${imageName}:`, scanError);

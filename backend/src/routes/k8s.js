@@ -165,7 +165,7 @@ router.get('/deployments-with-images', async (req, res) => {
     const requestedNamespace = req.query.namespace;
     const namespaceToUse = requestedNamespace || await getTargetNamespace();
 
-    console.log(`Fetching deployments for namespace: ${namespaceToUse}`);
+    // console.log(`Fetching deployments for namespace: ${namespaceToUse}`);
 
     const response = await appsV1Api.listNamespacedDeployment(namespaceToUse);
     const deployments = response.body.items.map(deployment => {

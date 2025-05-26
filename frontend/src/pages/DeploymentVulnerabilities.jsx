@@ -94,10 +94,30 @@ const DeploymentVulnerabilities = () => {
     }
   }, [selectedNamespace, token]);
 
-  if (loading && deployments.length === 0) { // Show loading only if there are no deployments yet
+  // Always show loading when switching namespaces, even if deployments are already loaded
+  if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '80vh'
+      }}>
+        <CircularProgress sx={{
+          color: '#2196f3',
+          mb: 3,
+          '& .MuiCircularProgress-circle': {
+            strokeLinecap: 'round',
+            filter: 'drop-shadow(0 0 2px #2196f3)'
+          }
+        }} />
+        <Typography variant="h6" sx={{ color: '#fff', opacity: 0.8 }}>
+          Scanning deployments in namespace: {selectedNamespace}
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#fff', opacity: 0.6, mt: 1 }}>
+          This may take a moment...
+        </Typography>
       </Box>
     );
   }

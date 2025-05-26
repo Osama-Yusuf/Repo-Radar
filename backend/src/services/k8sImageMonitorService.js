@@ -555,7 +555,7 @@ async function processDiscoveredImage(discoveredImage) {
         updates.image_digest = digest;
         updates.scan_status = 'pending';
         // updates.raw_trivy_output = null; // Drizzle specific for JSONB null. Handled by scan service.
-        updates.last_scanned_at = null; // Reset last_scanned_at for the new digest
+        updates.last_scanned_at = new Date(); // Set to current date instead of null to avoid NOT NULL constraint
         needsRescan = true;
         reasonForRescan = `new digest detected ('${digest.substring(0, 15)}' vs old '${existingImageEntry.image_digest ? existingImageEntry.image_digest.substring(0, 15) : 'NULL'}')`;
       } else if (!digest && existingImageEntry.image_digest) {
@@ -598,7 +598,7 @@ async function processDiscoveredImage(discoveredImage) {
         // Only last_seen_at and updated_at would be updated
         const basicUpdates = {
           last_seen_at: new Date(),
-          updated_at: new Date()
+          updated_at: new Date(),
         };
 
         if (namespace && (!existingImageEntry.namespace || existingImageEntry.namespace !== namespace)) {
