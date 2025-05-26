@@ -1,6 +1,6 @@
 const { db } = require('../config/drizzle-client');
 const { monitored_endpoints, endpoint_status_history } = require('../schema/schema');
-const { eq, desc, asc, and, sql, gte, lte, isNull } = require('drizzle-orm');
+const { eq, desc, and, sql, gte, lte, isNull, asc } = require('drizzle-orm');
 
 class AppStatusController {
     constructor(dbInstance) {
@@ -53,7 +53,10 @@ class AppStatusController {
             return res.status(400).json({ error: 'Invalid endpoint ID.' });
         }
 
-        const updates = { updated_at: new Date() };
+        const updates = {
+            updated_at: new Date()
+        };
+
         if (name) updates.name = name;
         if (url) updates.url = url;
         if (check_interval_seconds) {
@@ -72,22 +75,21 @@ class AppStatusController {
         try {
             const [updatedEndpoint] = await this.db.update(monitored_endpoints)
                 .set(updates)
-                .where(and(
-                    eq(monitored_endpoints.id, parseInt(endpointId)),
-                    eq(monitored_endpoints.type, 'custom') // Ensure only custom endpoints are updated this way
-                ))
+                .where(
+                    eq(monitored_endpoints.id, parseInt(endpointId))
+                )
                 .returning();
 
             if (!updatedEndpoint) {
-                return res.status(404).json({ error: 'Custom endpoint not found or not allowed to be updated.' });
+                return res.status(404).json({ error: 'Endpoint not found.' });
             }
             res.status(200).json(updatedEndpoint);
         } catch (error) {
             if (error.message && error.message.includes('monitored_endpoints_url_unique')) {
                 return res.status(409).json({ error: 'An endpoint with this URL already exists.' });
             }
-            console.error('Error updating custom endpoint:', error);
-            res.status(500).json({ error: 'Failed to update custom endpoint.' });
+            console.error('Error updating endpoint:', error);
+            res.status(500).json({ error: 'Failed to update endpoint.' });
         }
     }
 
@@ -101,21 +103,20 @@ class AppStatusController {
             // Soft delete: mark as deleted
             const [deletedEndpoint] = await this.db.update(monitored_endpoints)
                 .set({ is_deleted: true, updated_at: new Date() })
-                .where(and(
-                    eq(monitored_endpoints.id, parseInt(endpointId)),
-                    eq(monitored_endpoints.type, 'custom')
-                ))
+                .where(
+                    eq(monitored_endpoints.id, parseInt(endpointId))
+                )
                 .returning();
 
             if (!deletedEndpoint) {
-                return res.status(404).json({ error: 'Custom endpoint not found.' });
+                return res.status(404).json({ error: 'Endpoint not found.' });
             }
             // Actual deletion of history might be a separate concern or handled by cascade if hard delete was used.
             // For soft delete, history remains.
             res.status(204).send();
         } catch (error) {
-            console.error('Error deleting custom endpoint:', error);
-            res.status(500).json({ error: 'Failed to delete custom endpoint.' });
+            console.error('Error deleting endpoint:', error);
+            res.status(500).json({ error: 'Failed to delete endpoint.' });
         }
     }
 
