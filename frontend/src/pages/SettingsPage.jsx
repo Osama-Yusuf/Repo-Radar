@@ -3,7 +3,8 @@ import axios from 'axios';
 import {
     Tabs, Tab, TextField, Button, Paper, Typography, Box, CircularProgress, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem, FormControl, InputLabel
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem, FormControl, InputLabel,
+    useTheme, alpha
 } from '@mui/material';
 import AuthContext from '../contexts/AuthContext'; // Import AuthContext as default export
 
@@ -30,6 +31,7 @@ function TabPanel(props) {
 }
 
 const SettingsPage = () => {
+    const theme = useTheme();
     const [tabValue, setTabValue] = useState(0);
     const { currentUser, token } = useContext(AuthContext); // Get currentUser role and token
 
@@ -230,18 +232,75 @@ const SettingsPage = () => {
 
     if (currentUser?.role !== 'admin') {
         return (
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{
+                p: 3,
+                backgroundColor: '#1e1e2d',
+                color: '#fff',
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
+            }}>
                 <Typography variant="h6" color="error">Access Denied</Typography>
                 <Typography>You do not have permission to view this page.</Typography>
             </Paper>
         );
     }
 
+    // Dark theme styles for form inputs
+    const inputSx = {
+        '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+                borderColor: 'rgba(255, 255, 255, 0.23)',
+            },
+            '&:hover fieldset': {
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: '#2196f3',
+            },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'rgba(255, 255, 255, 0.7)',
+        },
+        '& .MuiInputBase-input': {
+            color: '#fff',
+        },
+    };
+
     return (
-        <Paper sx={{ m: 2, p: 2 }}>
-            <Typography variant="h4" gutterBottom>Settings</Typography>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
+        <Paper sx={{
+            m: 2,
+            p: 0,
+            backgroundColor: '#1e1e2d',
+            color: '#fff',
+            borderRadius: 2,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden'
+        }}>
+            <Box sx={{
+                p: 3,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'linear-gradient(90deg, #1a1a27 0%, #2d325a 100%)'
+            }}>
+                <Typography variant="h4" fontWeight="500">Settings</Typography>
+            </Box>
+
+            <Box sx={{ borderBottom: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <Tabs
+                    value={tabValue}
+                    onChange={handleTabChange}
+                    aria-label="settings tabs"
+                    sx={{
+                        '& .MuiTabs-indicator': {
+                            backgroundColor: '#2196f3',
+                        },
+                        '& .MuiTab-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&.Mui-selected': {
+                                color: '#2196f3',
+                            },
+                        },
+                    }}
+                >
                     <Tab label="General Settings" id="settings-tab-0" aria-controls="settings-tabpanel-0" />
                     <Tab label="User Management" id="settings-tab-1" aria-controls="settings-tabpanel-1" />
                 </Tabs>
@@ -249,18 +308,26 @@ const SettingsPage = () => {
 
             {/* General Settings Tab Panel */}
             <TabPanel value={tabValue} index={0}>
-                <Typography variant="h6" gutterBottom>General Application Settings</Typography>
-                {loadingGeneralSettings && <CircularProgress />}
-                {generalSettingsError && <Alert severity="error" sx={{ mb: 2 }}>{generalSettingsError}</Alert>}
-                {generalSettingsSuccess && <Alert severity="success" sx={{ mb: 2 }}>{generalSettingsSuccess}</Alert>}
+                <Typography variant="h6" gutterBottom sx={{ color: '#fff', fontWeight: 500 }}>
+                    General Application Settings
+                </Typography>
+                {loadingGeneralSettings && <CircularProgress sx={{ color: '#2196f3' }} />}
+                {generalSettingsError && <Alert severity="error" sx={{ mb: 2, backgroundColor: alpha('#f44336', 0.1), color: '#f44336' }}>{generalSettingsError}</Alert>}
+                {generalSettingsSuccess && <Alert severity="success" sx={{ mb: 2, backgroundColor: alpha('#4caf50', 0.1), color: '#4caf50' }}>{generalSettingsSuccess}</Alert>}
                 {!loadingGeneralSettings && (
-                    <Box component="form" sx={{ '& .MuiTextField-root': { m: 1, width: '50ch' }, display: 'flex', flexDirection: 'column' }}>
+                    <Box component="form" sx={{
+                        '& .MuiTextField-root': { m: 1, width: '100%', maxWidth: '500px' },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        mt: 2
+                    }}>
                         <TextField
                             label="GitHub API URL"
                             name="github_api_url"
                             value={generalSettings.github_api_url || ''}
                             onChange={handleGeneralSettingsChange}
                             variant="outlined"
+                            sx={inputSx}
                         />
                         <TextField
                             label="GitHub Token"
@@ -269,6 +336,7 @@ const SettingsPage = () => {
                             value={generalSettings.github_token || ''}
                             onChange={handleGeneralSettingsChange}
                             variant="outlined"
+                            sx={inputSx}
                         />
                         <TextField
                             label="Kubernetes Namespaces (comma-separated)"
@@ -277,8 +345,26 @@ const SettingsPage = () => {
                             onChange={handleGeneralSettingsChange}
                             variant="outlined"
                             helperText="e.g., default,kube-system,monitoring"
+                            sx={{
+                                ...inputSx,
+                                '& .MuiFormHelperText-root': {
+                                    color: 'rgba(255, 255, 255, 0.5)',
+                                }
+                            }}
                         />
-                        <Button variant="contained" onClick={handleSaveGeneralSettings} sx={{ mt: 2, width: 'fit-content' }} disabled={loadingGeneralSettings}>
+                        <Button
+                            variant="contained"
+                            onClick={handleSaveGeneralSettings}
+                            sx={{
+                                mt: 3,
+                                width: 'fit-content',
+                                backgroundColor: '#2196f3',
+                                '&:hover': {
+                                    backgroundColor: '#1976d2',
+                                }
+                            }}
+                            disabled={loadingGeneralSettings}
+                        >
                             Save General Settings
                         </Button>
                     </Box>
@@ -287,37 +373,90 @@ const SettingsPage = () => {
 
             {/* User Management Tab Panel */}
             <TabPanel value={tabValue} index={1}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6">User Management</Typography>
-                    <Button variant="contained" onClick={handleCreateUserDialogOpen}>Create User</Button>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h6" sx={{ color: '#fff', fontWeight: 500 }}>User Management</Typography>
+                    <Button
+                        variant="contained"
+                        onClick={handleCreateUserDialogOpen}
+                        sx={{
+                            backgroundColor: '#2196f3',
+                            '&:hover': {
+                                backgroundColor: '#1976d2',
+                            }
+                        }}
+                    >
+                        Create User
+                    </Button>
                 </Box>
-                {loadingUsers && <CircularProgress />}
-                {usersError && <Alert severity="error" sx={{ mb: 2 }}>{usersError}</Alert>}
-                {usersSuccess && <Alert severity="success" sx={{ mb: 2 }}>{usersSuccess}</Alert>}
+                {loadingUsers && <CircularProgress sx={{ color: '#2196f3' }} />}
+                {usersError && <Alert severity="error" sx={{ mb: 2, backgroundColor: alpha('#f44336', 0.1), color: '#f44336' }}>{usersError}</Alert>}
+                {usersSuccess && <Alert severity="success" sx={{ mb: 2, backgroundColor: alpha('#4caf50', 0.1), color: '#4caf50' }}>{usersSuccess}</Alert>}
 
-                <TableContainer component={Paper}>
-                    <Table sx={{ minWidth: 650 }} aria-label="simple table">
+                <TableContainer component={Paper} sx={{ backgroundColor: '#252536', boxShadow: 'none', borderRadius: 1 }}>
+                    <Table sx={{ minWidth: 650 }} aria-label="user management table">
                         <TableHead>
                             <TableRow>
-                                <TableCell>Username</TableCell>
-                                <TableCell>Role</TableCell>
-                                <TableCell>Created At</TableCell>
-                                <TableCell>Updated At</TableCell>
-                                <TableCell>Actions</TableCell>
+                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Username</TableCell>
+                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Role</TableCell>
+                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Created At</TableCell>
+                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Updated At</TableCell>
+                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {users.map((u) => (
-                                <TableRow key={u.id}>
-                                    <TableCell>{u.username}</TableCell>
-                                    <TableCell>{u.role}</TableCell>
-                                    <TableCell>{new Date(u.createdAt).toLocaleString()}</TableCell>
-                                    <TableCell>{new Date(u.updatedAt).toLocaleString()}</TableCell>
-                                    <TableCell>
-                                        <Button size="small" onClick={() => handleEditUserDialogOpen(u)} sx={{ mr: 1 }} disabled={u.id === currentUser.id && u.role === 'admin' && users.filter(adm => adm.role === 'admin').length === 1}>
+                                <TableRow key={u.id} sx={{ '&:hover': { backgroundColor: 'rgba(33, 150, 243, 0.08)' } }}>
+                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{u.username}</TableCell>
+                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                        <Box sx={{
+                                            display: 'inline-block',
+                                            px: 1.5,
+                                            py: 0.5,
+                                            borderRadius: 1,
+                                            backgroundColor: u.role === 'admin' ? 'rgba(33, 150, 243, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                            color: u.role === 'admin' ? '#2196f3' : '#fff',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 500
+                                        }}>
+                                            {u.role}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{new Date(u.createdAt).toLocaleString()}</TableCell>
+                                    <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>{new Date(u.updatedAt).toLocaleString()}</TableCell>
+                                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleEditUserDialogOpen(u)}
+                                            sx={{
+                                                mr: 1,
+                                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                                color: '#fff',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    color: 'rgba(255, 255, 255, 0.3)',
+                                                }
+                                            }}
+                                            disabled={u.id === currentUser.id && u.role === 'admin' && users.filter(adm => adm.role === 'admin').length === 1}
+                                        >
                                             Edit Role
                                         </Button>
-                                        <Button size="small" color="error" onClick={() => handleDeleteUserDialogOpen(u)} disabled={u.id === currentUser.id}>
+                                        <Button
+                                            size="small"
+                                            color="error"
+                                            onClick={() => handleDeleteUserDialogOpen(u)}
+                                            disabled={u.id === currentUser.id}
+                                            sx={{
+                                                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    color: 'rgba(255, 255, 255, 0.3)',
+                                                }
+                                            }}
+                                        >
                                             Delete
                                         </Button>
                                     </TableCell>
@@ -329,57 +468,219 @@ const SettingsPage = () => {
             </TabPanel>
 
             {/* Create User Dialog */}
-            <Dialog open={openCreateUserDialog} onClose={handleCreateUserDialogClose}>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogContent>
-                    <TextField autoFocus margin="dense" name="username" label="Username" type="text" fullWidth variant="standard" value={newUser.username} onChange={handleNewUserChange} />
-                    <TextField margin="dense" name="password" label="Password" type="password" fullWidth variant="standard" value={newUser.password} onChange={handleNewUserChange} />
-                    <FormControl fullWidth margin="dense" variant="standard">
+            <Dialog
+                open={openCreateUserDialog}
+                onClose={handleCreateUserDialogClose}
+                PaperProps={{
+                    sx: {
+                        backgroundColor: '#252536',
+                        color: '#fff',
+                        borderRadius: 2,
+                    }
+                }}
+            >
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Create New User</DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        name="username"
+                        label="Username"
+                        type="text"
+                        fullWidth
+                        variant="outlined"
+                        value={newUser.username}
+                        onChange={handleNewUserChange}
+                        sx={inputSx}
+                    />
+                    <TextField
+                        margin="dense"
+                        name="password"
+                        label="Password"
+                        type="password"
+                        fullWidth
+                        variant="outlined"
+                        value={newUser.password}
+                        onChange={handleNewUserChange}
+                        sx={inputSx}
+                    />
+                    <FormControl
+                        fullWidth
+                        margin="dense"
+                        variant="outlined"
+                        sx={{ mt: 2, ...inputSx }}
+                    >
                         <InputLabel id="create-user-role-label">Role</InputLabel>
-                        <Select labelId="create-user-role-label" name="role" value={newUser.role} onChange={handleNewUserChange} label="Role">
+                        <Select
+                            labelId="create-user-role-label"
+                            name="role"
+                            value={newUser.role}
+                            onChange={handleNewUserChange}
+                            label="Role"
+                            sx={{
+                                color: '#fff',
+                                '& .MuiSvgIcon-root': {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                }
+                            }}
+                        >
                             <MenuItem value="user">User</MenuItem>
                             <MenuItem value="admin">Admin</MenuItem>
                         </Select>
                     </FormControl>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCreateUserDialogClose}>Cancel</Button>
-                    <Button onClick={handleCreateUser} disabled={loadingUsers}>Create</Button>
+                <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <Button
+                        onClick={handleCreateUserDialogClose}
+                        sx={{
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&:hover': {
+                                color: '#fff',
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            }
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleCreateUser}
+                        disabled={loadingUsers}
+                        sx={{
+                            backgroundColor: '#2196f3',
+                            color: '#fff',
+                            '&:hover': {
+                                backgroundColor: '#1976d2',
+                            },
+                            '&.Mui-disabled': {
+                                color: 'rgba(255, 255, 255, 0.3)',
+                            }
+                        }}
+                    >
+                        Create
+                    </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Edit User Role Dialog */}
-            <Dialog open={openEditUserDialog} onClose={handleEditUserDialogClose}>
-                <DialogTitle>Edit User Role</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Change role for user: {currentUserToEdit?.username}
+            <Dialog
+                open={openEditUserDialog}
+                onClose={handleEditUserDialogClose}
+                PaperProps={{
+                    sx: {
+                        backgroundColor: '#252536',
+                        color: '#fff',
+                        borderRadius: 2,
+                    }
+                }}
+            >
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Edit User Role</DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <DialogContentText sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
+                        Change role for user: <span style={{ color: '#2196f3', fontWeight: 500 }}>{currentUserToEdit?.username}</span>
                     </DialogContentText>
-                    <FormControl fullWidth margin="dense" variant="standard">
+                    <FormControl
+                        fullWidth
+                        margin="dense"
+                        variant="outlined"
+                        sx={inputSx}
+                    >
                         <InputLabel id="edit-user-role-label">New Role</InputLabel>
-                        <Select labelId="edit-user-role-label" value={editUserRole} onChange={handleEditUserRoleChange} label="New Role">
+                        <Select
+                            labelId="edit-user-role-label"
+                            value={editUserRole}
+                            onChange={handleEditUserRoleChange}
+                            label="New Role"
+                            sx={{
+                                color: '#fff',
+                                '& .MuiSvgIcon-root': {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                }
+                            }}
+                        >
                             <MenuItem value="user">User</MenuItem>
                             <MenuItem value="admin">Admin</MenuItem>
                         </Select>
                     </FormControl>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleEditUserDialogClose}>Cancel</Button>
-                    <Button onClick={handleUpdateUserRole} disabled={loadingUsers}>Save Changes</Button>
+                <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <Button
+                        onClick={handleEditUserDialogClose}
+                        sx={{
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&:hover': {
+                                color: '#fff',
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            }
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleUpdateUserRole}
+                        disabled={loadingUsers}
+                        sx={{
+                            backgroundColor: '#2196f3',
+                            color: '#fff',
+                            '&:hover': {
+                                backgroundColor: '#1976d2',
+                            },
+                            '&.Mui-disabled': {
+                                color: 'rgba(255, 255, 255, 0.3)',
+                            }
+                        }}
+                    >
+                        Save Changes
+                    </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Delete User Confirmation Dialog */}
-            <Dialog open={openDeleteUserDialog} onClose={handleDeleteUserDialogClose}>
-                <DialogTitle>Delete User</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Are you sure you want to delete user: {currentUserToDelete?.username}? This action cannot be undone.
+            <Dialog
+                open={openDeleteUserDialog}
+                onClose={handleDeleteUserDialogClose}
+                PaperProps={{
+                    sx: {
+                        backgroundColor: '#252536',
+                        color: '#fff',
+                        borderRadius: 2,
+                    }
+                }}
+            >
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#f44336' }}>Delete User</DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <DialogContentText sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                        Are you sure you want to delete user: <span style={{ color: '#f44336', fontWeight: 500 }}>{currentUserToDelete?.username}</span>? This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleDeleteUserDialogClose}>Cancel</Button>
-                    <Button onClick={handleDeleteUser} color="error" disabled={loadingUsers}>Delete</Button>
+                <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <Button
+                        onClick={handleDeleteUserDialogClose}
+                        sx={{
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&:hover': {
+                                color: '#fff',
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            }
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteUser}
+                        color="error"
+                        disabled={loadingUsers}
+                        sx={{
+                            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                            },
+                            '&.Mui-disabled': {
+                                color: 'rgba(255, 255, 255, 0.3)',
+                            }
+                        }}
+                    >
+                        Delete
+                    </Button>
                 </DialogActions>
             </Dialog>
 
